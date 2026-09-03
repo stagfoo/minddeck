@@ -1,0 +1,158 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'stack_layout.dart';
+import 'theme.dart';
+
+/// The pull knob: this phone has no scroll wheel, so the deck gets a grip you
+/// drag up and down the right edge instead.
+///
+/// Deliberately physical — a ridged grip on a recessed track, sized to how
+/// much deck there is, with a haptic tick as each card takes focus. It should
+/// feel like a thing you pull, which is the only reason to have it rather than
+/// a scrollbar.
+class SideRail extends StatefulWidget {
+  const SideRail({
+    super.key,
+    required this.cardCount,
+    required this.focusedIndex,
+    required this.onFocusChanged,
+  });
+
+  final int cardCount;
+  final int focusedIndex;
+  final ValueChanged<int> onFocusChanged;
+
+  @override
+  State<SideRail> createState() => _SideRailState();
+}
+
+class _SideRailState extends State<SideRail> {
+  bool _dragging = false;
+
+  void _select(double y, double trackHeight) {
+    final index = cardIndexForKnobPosition(
+      y: y,
+      trackHeight: trackHeight,
+      cardCount: widget.cardCount,
+    );
+    if (index != widget.focusedIndex) {
+      HapticFeedback.selectionClick();
+      widget.onFocusChanged(index);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: DeckMetrics.railWidth,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final trackHeight = constraints.maxHeight;
+          final knob = solveKnob(
+            trackHeight: trackHeight,
+            cardCount: widget.cardCount,
+            focusedIndex: widget.focusedIndex,
+          );
+
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onVerticalDragStart: (details) {
+              setState(() => _dragging = true);
+              _select(details.localPosition.dy, trackHeight);
+            },
+            onVerticalDragUpdate: (details) =>
+                _select(details.localPosition.dy, trackHeight),
+            onVerticalDragEnd: (_) => setState(() => _dragging = false),
+            onVerticalDragCancel: () => setState(() => _dragging = false),
+            // Tapping the track jumps the knob there, the way a scrollbar
+            // gutter does — dragging is not the only way to move.
+            onTapDown: (details) => _select(details.localPosition.dy, trackHeight),
+            child: Stack(
+              children: [
+                Center(
+                  child: Container(
+                    width: 6,
+                    decoration: BoxDecoration(
+                      color: DeckColors.surface,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                AnimatedPositioned(
+                  duration: _dragging
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  top: knob.top,
+                  height: knob.height,
+                  left: 0,
+                  right: 0,
+                  child: Center(child: _Knob(active: _dragging)),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _Knob extends StatelessWidget {
+  const _Knob({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      width: active ? 24 : 20,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFFFF6A22) : const Color(0xFF3A3A44),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(
+          color: active ? const Color(0xFFFF8A4C) : DeckColors.surfaceEdge,
+        ),
+        boxShadow: active
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFFF6A22).withValues(alpha: 0.4),
+                  blurRadius: 14,
+                ),
+              ]
+            : null,
+      ),
+      child: const _Ridges(),
+    );
+  }
+}
+
+/// Three ridges across the grip. Purely decorative, and the whole reason the
+/// knob reads as something to pull rather than a plain pill.
+class _Ridges extends StatelessWidget {
+  const _Ridges();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < 3; i++)
+            Container(
+              width: 9,
+              height: 1.5,
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              decoration: BoxDecoration(
+                color: DeckColors.ground.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

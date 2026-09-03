@@ -11,12 +11,12 @@ class StatusStrip extends StatefulWidget {
   const StatusStrip({
     super.key,
     required this.onSettings,
-    required this.onSearch,
+    required this.onAdd,
     this.onLongPressClock,
   });
 
   final VoidCallback onSettings;
-  final VoidCallback onSearch;
+  final VoidCallback onAdd;
 
   /// Long-pressing the clock reports the measured panel geometry. There is no
   /// adb on this device day to day, and the whole layout is tuned to numbers
@@ -53,7 +53,7 @@ class _StatusStripState extends State<StatusStrip> {
     return SizedBox(
       height: DeckMetrics.stripHeight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: DeckMetrics.deckPadding),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(
           children: [
             GestureDetector(
@@ -69,7 +69,7 @@ class _StatusStripState extends State<StatusStrip> {
               ),
             ),
             const Spacer(),
-            _StripButton(icon: Icons.search, onTap: widget.onSearch),
+            _StripButton(icon: Icons.add_rounded, onTap: widget.onAdd),
             const SizedBox(width: 4),
             _StripButton(icon: Icons.settings_outlined, onTap: widget.onSettings),
           ],

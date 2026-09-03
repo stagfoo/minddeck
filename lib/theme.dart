@@ -1,32 +1,76 @@
-/// The Switch's home screen look, adapted.
+/// The look: near-black ground, saturated cards, black text on colour.
 ///
-/// Nintendo's dark theme is a near-black ground with slightly lighter cards, a
-/// thin top strip, and a bright cyan-white rim on whatever is selected. That
-/// last part is the whole identity — everything else is restraint.
+/// Borrowed from the rabbitOS stack — the colour is the whole interface, so
+/// everything around it stays out of the way.
 library;
 
 import 'package:flutter/material.dart';
 
+import 'card_style.dart';
+
 class DeckColors {
-  static const ground = Color(0xFF1B1B1F);
-  static const strip = Color(0xFF141417);
-  static const card = Color(0xFF2C2C33);
-  static const cardEdge = Color(0xFF3A3A43);
-  static const selection = Color(0xFF00D2E6);
-  static const text = Color(0xFFF2F2F5);
-  static const textDim = Color(0xFF9A9AA5);
+  static const ground = Color(0xFF08080A);
+  static const strip = Color(0xFF101014);
+  static const surface = Color(0xFF1A1A1F);
+  static const surfaceEdge = Color(0xFF2A2A32);
+  static const text = Color(0xFFF4F4F7);
+  static const textDim = Color(0xFF83838F);
+
+  /// Text and glyphs sitting on a card. The palette is chosen so black always
+  /// reads, which is what keeps the stack looking like one thing.
+  static const onCard = Color(0xFF0A0A0C);
 }
 
 class DeckMetrics {
-  /// The strip carrying the clock and battery.
-  static const stripHeight = 44.0;
+  static const stripHeight = 40.0;
+  static const railWidth = 34.0;
+  static const gutter = 12.0;
+  static const cardRadius = 14.0;
+}
 
-  /// The system-button row along the bottom, the Switch's News/eShop/Settings
-  /// bar.
-  static const systemRowHeight = 56.0;
+Color colorOf(String key) => Color(colorForKey(key).value);
 
-  static const deckPadding = 16.0;
-  static const tileRadius = 14.0;
+/// Glyph for a stored icon key. The model holds keys, not Flutter types, so
+/// this is the one place the two vocabularies meet.
+IconData iconOf(String key) {
+  switch (normaliseIconKey(key)) {
+    case 'apps':
+      return Icons.grid_view_rounded;
+    case 'camera':
+      return Icons.photo_camera_rounded;
+    case 'music':
+      return Icons.music_note_rounded;
+    case 'photo':
+      return Icons.image_rounded;
+    case 'chat':
+      return Icons.chat_bubble_rounded;
+    case 'globe':
+      return Icons.public_rounded;
+    case 'game':
+      return Icons.sports_esports_rounded;
+    case 'book':
+      return Icons.menu_book_rounded;
+    case 'map':
+      return Icons.map_rounded;
+    case 'clock':
+      return Icons.schedule_rounded;
+    case 'heart':
+      return Icons.favorite_rounded;
+    case 'star':
+      return Icons.star_rounded;
+    case 'bolt':
+      return Icons.bolt_rounded;
+    case 'cog':
+      return Icons.settings_rounded;
+    case 'wallet':
+      return Icons.account_balance_wallet_rounded;
+    case 'note':
+      return Icons.sticky_note_2_rounded;
+    case 'tools':
+      return Icons.build_rounded;
+    default:
+      return Icons.folder_rounded;
+  }
 }
 
 ThemeData buildDeckTheme() {
@@ -36,9 +80,8 @@ ThemeData buildDeckTheme() {
     scaffoldBackgroundColor: DeckColors.ground,
     colorScheme: const ColorScheme.dark(
       surface: DeckColors.ground,
-      primary: DeckColors.selection,
-      onPrimary: Color(0xFF06212A),
-      secondary: DeckColors.card,
+      primary: Color(0xFFFF4F00),
+      onPrimary: DeckColors.onCard,
     ),
     textTheme: const TextTheme().apply(
       bodyColor: DeckColors.text,

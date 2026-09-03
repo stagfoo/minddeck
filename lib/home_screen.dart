@@ -2,18 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'all_apps_sheet.dart';
-import 'app_order.dart';
-import 'app_tile.dart';
+import 'card_deck.dart';
+import 'card_editor_sheet.dart';
+import 'deck_card_view.dart';
 import 'deck_store.dart';
-import 'grid_layout.dart';
+import 'folder_screen.dart';
 import 'launcher_bridge.dart';
 import 'models.dart';
+import 'side_rail.dart';
+import 'stack_layout.dart';
 import 'status_strip.dart';
 import 'theme.dart';
 
-/// The home screen itself: status strip, the deck of pinned tiles, and the
-/// system row along the bottom.
+/// The home screen: a vertical stack of coloured cards with a pull knob down
+/// the right edge, the last card being everything installed.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -25,8 +27,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final _store = DeckStore();
 
   List<LaunchableApp> _installed = const [];
-  Deck _deck = const Deck();
+  CardDeck _deck = CardDeck.normalised(const []);
   ScreenMetrics? _metrics;
+  int _focused = 0;
   bool _loading = true;
   bool _isDefault = true;
   StreamSubscription<String>? _packageSub;
@@ -35,11 +38,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _load();
-    _packageSub = LauncherBridge.instance.packageChanges.listen((_) => _refreshApps());
-    // Pressing HOME while already home closes whatever is open, the way every
-    // stock launcher behaves.
+    _packageSub =
+        LauncherBridge.instance.packageChanges.listen((_) => _refreshApps());
     LauncherBridge.instance.onHomePressed(() {
-      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      setState(() => _focused = 0);
     });
   }
 
@@ -55,9 +59,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDefault = await LauncherBridge.instance.isDefaultLauncher();
     var deck = await _store.load();
 
-    // First run on a phone: an empty home screen looks broken, so seed it.
-    if (deck.pinnedIds.isEmpty && apps.isNotEmpty) {
-      deck = Deck.seedFrom(apps);
+    // First run: a stack with nothing but "all apps" looks broken, and naming
+    // a few starter cards is a better first impression than an empty screen.
+    if (deck == null || deck.folders.isEmpty) {
+      deck = CardDeck.seed();
       await _store.save(deck);
     }
 
@@ -65,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _installed = apps;
       _metrics = metrics;
-      _deck = deck;
+      _deck = deck!;
       _isDefault = isDefault;
       _loading = false;
     });
@@ -77,16 +82,18 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _installed = apps);
   }
 
-  Future<void> _update(Deck deck) async {
-    setState(() => _deck = deck);
+  Future<void> _update(CardDeck deck) async {
+    setState(() {
+      _deck = deck;
+      _focused = _focused.clamp(0, deck.length - 1);
+    });
     await _store.save(deck);
   }
 
   @override
   Widget build(BuildContext context) {
     // Back must not leave the home screen — there is nothing behind it, and
-    // letting the activity finish makes the system restart it, which reads as
-    // a flicker.
+    // letting the activity finish makes the system restart it.
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -94,18 +101,17 @@ class _HomeScreenState extends State<HomeScreen> {
         body: SafeArea(
           child: _loading
               ? const Center(
-                  child: CircularProgressIndicator(color: DeckColors.selection),
+                  child: CircularProgressIndicator(color: Color(0xFFFF4F00)),
                 )
               : Column(
                   children: [
                     StatusStrip(
                       onSettings: LauncherBridge.instance.openSettings,
-                      onSearch: () => _openAllApps(startSearching: true),
+                      onAdd: _addCard,
                       onLongPressClock: _showMetrics,
                     ),
                     if (!_isDefault) _defaultLauncherBanner(),
-                    Expanded(child: _deckArea()),
-                    _systemRow(),
+                    Expanded(child: _stack()),
                   ],
                 ),
         ),
@@ -113,26 +119,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Until the phone is actually handed over, say so — a launcher you have to
-  /// open from another launcher is a confusing thing to be looking at.
   Widget _defaultLauncherBanner() {
     return Material(
-      color: DeckColors.selection.withValues(alpha: 0.14),
+      color: const Color(0xFFFF4F00).withValues(alpha: 0.16),
       child: InkWell(
         onTap: LauncherBridge.instance.openHomeSettings,
         child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: DeckMetrics.deckPadding, vertical: 8),
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           child: Row(
             children: [
-              Icon(Icons.home_outlined, size: 16, color: DeckColors.selection),
+              Icon(Icons.home_outlined, size: 15, color: Color(0xFFFF7A3C)),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Not the home app yet — tap to set MindDeck as default',
-                  style: TextStyle(fontSize: 12, color: DeckColors.text),
+                  style: TextStyle(fontSize: 11, color: DeckColors.text),
                 ),
               ),
-              Icon(Icons.chevron_right, size: 16, color: DeckColors.selection),
+              Icon(Icons.chevron_right, size: 15, color: Color(0xFFFF7A3C)),
             ],
           ),
         ),
@@ -140,187 +144,117 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _deckArea() {
-    final pinned = _deck.resolve(_installed);
+  Widget _stack() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: DeckMetrics.deckPadding),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // Tiles carry a label underneath, so the solver gets the box minus
-          // that strip and the grid still fits.
-          const labelStrip = 22.0;
-          final grid = solveGrid(
-            width: constraints.maxWidth,
-            height: constraints.maxHeight - labelStrip,
-          );
-
-          if (pinned.isEmpty) {
-            return Center(
-              child: TextButton.icon(
-                onPressed: () => _openAllApps(),
-                icon: const Icon(Icons.add, color: DeckColors.selection),
-                label: const Text(
-                  'Pick some apps for the deck',
-                  style: TextStyle(color: DeckColors.text),
-                ),
-              ),
-            );
-          }
-
-          final visible = pinned.take(grid.capacity).toList();
-          return Center(
-            child: SizedBox(
-              width: grid.contentWidth,
-              child: Wrap(
-                spacing: grid.gap,
-                runSpacing: grid.gap,
-                alignment: WrapAlignment.center,
-                children: [
-                  for (final app in visible)
-                    AppTile(
-                      key: ValueKey(app.id),
-                      app: app,
-                      size: grid.tileSize,
-                      onTap: () => LauncherBridge.instance.launch(app.packageName),
-                      onLongPress: () => _showTileMenu(app),
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _systemRow() {
-    return Container(
-      height: DeckMetrics.systemRowHeight,
-      color: DeckColors.strip,
-      padding: const EdgeInsets.symmetric(horizontal: DeckMetrics.deckPadding),
+      padding: const EdgeInsets.fromLTRB(DeckMetrics.gutter, 6, 4, 10),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SystemButton(
-            icon: Icons.apps,
-            label: 'All apps',
-            onTap: () => _openAllApps(),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final spec = solveStack(
+                  height: constraints.maxHeight,
+                  cardCount: _deck.length,
+                  focusedIndex: _focused,
+                );
+                return GestureDetector(
+                  // Swiping the stack itself moves focus too — the knob is the
+                  // deliberate affordance, not the only one.
+                  onVerticalDragEnd: (details) {
+                    final velocity = details.primaryVelocity ?? 0;
+                    if (velocity < -200) {
+                      _moveFocus(1);
+                    } else if (velocity > 200) {
+                      _moveFocus(-1);
+                    }
+                  },
+                  child: Stack(
+                    children: [
+                      for (var i = 0; i < _deck.length; i++)
+                        AnimatedPositioned(
+                          key: ValueKey(_deck[i].id),
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          left: 0,
+                          right: 0,
+                          top: spec.topOf(i),
+                          height: spec.heightOf(i),
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: DeckCardView(
+                              card: _deck[i],
+                              height: spec.heightOf(i) - 4,
+                              focused: i == spec.focusedIndex,
+                              appCount: _deck[i].isAllApps
+                                  ? _installed.length
+                                  : _deck[i].resolve(_installed).length,
+                              onTap: () => i == _focused
+                                  ? _openCard(_deck[i])
+                                  : setState(() => _focused = i),
+                              onLongPress: () => _editCard(_deck[i]),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-          _SystemButton(
-            icon: Icons.tune,
-            label: 'Arrange',
-            onTap: () => _openAllApps(),
-          ),
-          _SystemButton(
-            icon: Icons.settings,
-            label: 'Settings',
-            onTap: LauncherBridge.instance.openSettings,
+          SideRail(
+            cardCount: _deck.length,
+            focusedIndex: _focused,
+            onFocusChanged: (index) => setState(() => _focused = index),
           ),
         ],
       ),
     );
   }
 
-  /// Reports what the panel actually measured, so the tuning numbers in
-  /// GridStyle can be checked against reality rather than assumed.
+  void _moveFocus(int delta) {
+    setState(() => _focused = (_focused + delta).clamp(0, _deck.length - 1));
+  }
+
+  Future<void> _openCard(DeckCard card) async {
+    final chosen = await Navigator.of(context).push<LaunchableApp>(
+      MaterialPageRoute(
+        builder: (context) => FolderScreen(
+          card: card,
+          deck: _deck,
+          installed: _installed,
+          onDeckChanged: _update,
+        ),
+      ),
+    );
+    if (chosen != null) {
+      await LauncherBridge.instance.launch(chosen.packageName);
+    }
+  }
+
+  Future<void> _editCard(DeckCard card) async {
+    if (card.isAllApps) return;
+    final edited = await showCardEditor(context, card);
+    if (edited == null) return;
+    await _update(_deck.updateCard(card.id, (_) => edited));
+  }
+
+  Future<void> _addCard() async {
+    final deck = _deck.addCard('new card');
+    await _update(deck);
+    final added = deck.folders.last;
+    setState(() => _focused = deck.indexOfId(added.id));
+    await _editCard(added);
+  }
+
   void _showMetrics() {
     final metrics = _metrics;
     if (metrics == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: DeckColors.card,
-        content: Text(
-          '$metrics',
-          style: const TextStyle(color: DeckColors.text, fontSize: 12),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openAllApps({bool startSearching = false}) async {
-    await showAllAppsSheet(
-      context,
-      installed: _installed,
-      deck: _deck,
-      startSearching: startSearching,
-      onDeckChanged: _update,
-    );
-  }
-
-  Future<void> _showTileMenu(LaunchableApp app) async {
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: DeckColors.strip,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text(app.label, style: const TextStyle(color: DeckColors.text)),
-              subtitle: Text(
-                app.packageName,
-                style: const TextStyle(color: DeckColors.textDim, fontSize: 11),
-              ),
-            ),
-            const Divider(height: 1, color: DeckColors.cardEdge),
-            ListTile(
-              leading: const Icon(Icons.push_pin_outlined, color: DeckColors.textDim),
-              title: const Text('Remove from deck',
-                  style: TextStyle(color: DeckColors.text)),
-              onTap: () => Navigator.pop(context, 'unpin'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.info_outline, color: DeckColors.textDim),
-              title: const Text('App info', style: TextStyle(color: DeckColors.text)),
-              onTap: () => Navigator.pop(context, 'info'),
-            ),
-            if (!app.isSystem)
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: DeckColors.textDim),
-                title:
-                    const Text('Uninstall', style: TextStyle(color: DeckColors.text)),
-                onTap: () => Navigator.pop(context, 'uninstall'),
-              ),
-          ],
-        ),
-      ),
-    );
-
-    switch (action) {
-      case 'unpin':
-        await _update(_deck.unpin(app.id));
-      case 'info':
-        await LauncherBridge.instance.openAppInfo(app.packageName);
-      case 'uninstall':
-        await LauncherBridge.instance.requestUninstall(app.packageName);
-    }
-  }
-}
-
-class _SystemButton extends StatelessWidget {
-  const _SystemButton({required this.icon, required this.label, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 20, color: DeckColors.textDim),
-            const SizedBox(height: 2),
-            Text(label,
-                style: const TextStyle(fontSize: 10, color: DeckColors.textDim)),
-          ],
-        ),
+        backgroundColor: DeckColors.surface,
+        content: Text('$metrics',
+            style: const TextStyle(color: DeckColors.text, fontSize: 12)),
       ),
     );
   }
