@@ -13,9 +13,9 @@ import 'theme.dart';
 /// the deck read as overlapping cards, and it means a covered card never has
 /// to squeeze its contents into a sliver.
 ///
-/// The header is the fixed top strip: name on the left, mark on the right,
-/// like the title row of a real card. It is the part that stays visible when
-/// the card is covered, so it holds everything you need to identify it.
+/// The name sits in a fixed strip at the card's *bottom* edge, because that is
+/// the part left visible when the card in front covers it. It holds everything
+/// needed to identify the card: name, count and mark.
 class DeckCardView extends StatelessWidget {
   const DeckCardView({
     super.key,
@@ -67,8 +67,8 @@ class DeckCardView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _header(),
             Expanded(child: _body(color)),
+            _nameStrip(),
           ],
         ),
       ),
@@ -76,7 +76,7 @@ class DeckCardView extends StatelessWidget {
   }
 
   /// The strip that stays visible when this card is covered.
-  Widget _header() {
+  Widget _nameStrip() {
     return SizedBox(
       height: StackStyle.headerHeight,
       child: Padding(
@@ -117,7 +117,7 @@ class DeckCardView extends StatelessWidget {
   Widget _body(Color color) {
     if (apps.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
         child: Align(
           alignment: Alignment.centerLeft,
           child: Text(

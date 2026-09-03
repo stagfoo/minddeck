@@ -4,21 +4,25 @@ A portrait card-stack home launcher for the **iKKO Mind One** — a card-sized
 Android 15 phone with a 1080 × 1240 panel.
 
 Each card is a coloured folder holding a sideways-scrolling row of apps. The
-cards **overlap** like a wallet: every card is drawn full height and offset by
-less than that, so each one slides under the next and you see its top strip —
-name, count, mark — with its lower half and bottom corners hidden behind the
-card in front. The focused card is the exception: everything after it is pushed
-clear of its bottom edge, so it's revealed whole. The last card is **all apps**
-and can't be moved or deleted.
+cards **overlap like a rolodex**: the first card is the front of the deck and
+every card after it sits *behind* the one before, receding downward — so **all
+apps**, always last, is always at the very back, and can't be moved or deleted.
+
+A covered card reveals its **bottom strip** below the card in front of it, which
+is why the name, count and mark live at a card's bottom edge: that strip is the
+only part of it you can see. The focused card is revealed whole, and the cards
+in front of it slide up until their bottoms meet its top edge — no card is ever
+lifted out of the paint order, the positions alone do it.
 
 Apps live **on** the card, in a row you scroll sideways. Sideways rather than a
 wrapped grid because a card is wide and short, and because it keeps the vertical
 gesture free for the stack — the one that has to stay reliable.
 
 The phone has no scroll wheel, so the deck gets a **pull knob** down the right
-edge instead — a ridged grip on a recessed track that you drag up and down,
-with a haptic tick as each card takes focus. Swiping the stack and tapping the
-track work too; the knob is the deliberate affordance, not the only one.
+edge instead — a ridged grip on a recessed track, with a haptic tick as each
+card takes focus. The **whole right band** is the grab area, top to bottom: a
+thin track would be a hairline target on a screen this small, and the thumb
+rests there anyway. Swiping the stack and tapping the track work too.
 
 ## Cards
 

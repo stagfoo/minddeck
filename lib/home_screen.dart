@@ -111,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     StatusStrip(
                       onSettings: LauncherBridge.instance.openSettings,
                       onAdd: _addCard,
-                      onLongPressClock: _showMetrics,
+                      onLongPressSettings: _showMetrics,
                     ),
                     if (!_isDefault) _defaultLauncherBanner(),
                     Expanded(child: _stack()),
@@ -172,7 +172,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     // fanned deck does — the scroll view clips it.
                     clipBehavior: Clip.none,
                     children: [
-                      for (var i = 0; i < _deck.length; i++)
+                      // Back to front: the last card — always all apps — is
+                      // painted first and stays behind everything, and the
+                      // first card sits at the front of the deck.
+                      for (final i in spec.paintOrder)
                         AnimatedPositioned(
                           key: ValueKey(_deck[i].id),
                           duration: const Duration(milliseconds: 220),

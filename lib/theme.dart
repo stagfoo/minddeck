@@ -23,7 +23,9 @@ class DeckColors {
 
 class DeckMetrics {
   static const stripHeight = 40.0;
-  static const railWidth = 34.0;
+  /// The full right band is the scrub area — a thin track would be a hairline
+  /// target on a screen this small. The visible parts sit inside it.
+  static const railWidth = 52.0;
   static const gutter = 12.0;
   static const cardRadius = 14.0;
 }

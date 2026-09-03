@@ -7,6 +7,11 @@ import 'theme.dart';
 /// The pull knob: this phone has no scroll wheel, so the deck gets a grip you
 /// drag up and down the right edge instead.
 ///
+/// The whole right band is the grab area, top to bottom — a thin track would
+/// be a hairline target on a screen this small, and the thumb rests there
+/// anyway. The track and grip drawn inside it are just the visible part of a
+/// column that is draggable everywhere.
+///
 /// Deliberately physical — a ridged grip on a recessed track, sized to how
 /// much deck there is, with a haptic tick as each card takes focus. It should
 /// feel like a thing you pull, which is the only reason to have it rather than
@@ -72,10 +77,11 @@ class _SideRailState extends State<SideRail> {
               children: [
                 Center(
                   child: Container(
-                    width: 6,
+                    width: 30,
                     decoration: BoxDecoration(
                       color: DeckColors.surface,
-                      borderRadius: BorderRadius.circular(3),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: DeckColors.surfaceEdge),
                     ),
                   ),
                 ),
@@ -108,11 +114,11 @@ class _Knob extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
-      width: active ? 24 : 20,
+      width: active ? 34 : 30,
       height: double.infinity,
       decoration: BoxDecoration(
         color: active ? const Color(0xFFFF6A22) : const Color(0xFF3A3A44),
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(15),
         border: Border.all(
           color: active ? const Color(0xFFFF8A4C) : DeckColors.surfaceEdge,
         ),
@@ -143,9 +149,9 @@ class _Ridges extends StatelessWidget {
         children: [
           for (var i = 0; i < 3; i++)
             Container(
-              width: 9,
-              height: 1.5,
-              margin: const EdgeInsets.symmetric(vertical: 2),
+              width: 14,
+              height: 2,
+              margin: const EdgeInsets.symmetric(vertical: 2.5),
               decoration: BoxDecoration(
                 color: DeckColors.ground.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(1),

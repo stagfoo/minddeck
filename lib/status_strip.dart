@@ -1,77 +1,43 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-/// The thin bar across the top: clock on the left, actions on the right — the
-/// Switch's user/time/battery strip, minus the things a phone already draws in
-/// its own status bar.
-class StatusStrip extends StatefulWidget {
+/// The thin bar above the deck: just the two actions.
+///
+/// No clock — Android already draws one in the status bar a few pixels above,
+/// and two of them stacked was the first thing that looked wrong on the device.
+class StatusStrip extends StatelessWidget {
   const StatusStrip({
     super.key,
     required this.onSettings,
     required this.onAdd,
-    this.onLongPressClock,
+    this.onLongPressSettings,
   });
 
   final VoidCallback onSettings;
   final VoidCallback onAdd;
 
-  /// Long-pressing the clock reports the measured panel geometry. There is no
-  /// adb on this device day to day, and the whole layout is tuned to numbers
-  /// that had to be guessed until it ran — this is how they get confirmed.
-  final VoidCallback? onLongPressClock;
-
-  @override
-  State<StatusStrip> createState() => _StatusStripState();
-}
-
-class _StatusStripState extends State<StatusStrip> {
-  late Timer _tick;
-  DateTime _now = DateTime.now();
-
-  @override
-  void initState() {
-    super.initState();
-    // Ticking per second would rebuild sixty times more often than the display
-    // can change; align to the minute instead.
-    _tick = Timer.periodic(const Duration(seconds: 10), (_) {
-      final now = DateTime.now();
-      if (now.minute != _now.minute) setState(() => _now = now);
-    });
-  }
-
-  @override
-  void dispose() {
-    _tick.cancel();
-    super.dispose();
-  }
+  /// Long-pressing settings reports the measured panel geometry. There is no
+  /// adb on this device day to day, and the layout is tuned to numbers that had
+  /// to be guessed until it ran — this is how they get confirmed.
+  final VoidCallback? onLongPressSettings;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: DeckMetrics.stripHeight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            GestureDetector(
-              onLongPress: widget.onLongPressClock,
-              child: Text(
-                formatClock(_now),
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w500,
-                  color: DeckColors.text,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-            const Spacer(),
-            _StripButton(icon: Icons.add_rounded, onTap: widget.onAdd),
+            _StripButton(icon: Icons.add_rounded, onTap: onAdd),
             const SizedBox(width: 4),
-            _StripButton(icon: Icons.settings_outlined, onTap: widget.onSettings),
+            _StripButton(
+              icon: Icons.settings_outlined,
+              onTap: onSettings,
+              onLongPress: onLongPressSettings,
+            ),
           ],
         ),
       ),
@@ -79,27 +45,22 @@ class _StatusStripState extends State<StatusStrip> {
   }
 }
 
-/// 24-hour, zero-padded — "09:05".
-String formatClock(DateTime when) {
-  final hour = when.hour.toString().padLeft(2, '0');
-  final minute = when.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
-}
-
 class _StripButton extends StatelessWidget {
-  const _StripButton({required this.icon, required this.onTap});
+  const _StripButton({required this.icon, required this.onTap, this.onLongPress});
 
   final IconData icon;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     return InkResponse(
       onTap: onTap,
-      radius: 22,
+      onLongPress: onLongPress,
+      radius: 24,
       child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(icon, size: 20, color: DeckColors.textDim),
+        padding: const EdgeInsets.all(9),
+        child: Icon(icon, size: 21, color: DeckColors.textDim),
       ),
     );
   }

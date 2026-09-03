@@ -1,19 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minddeck/models.dart';
-import 'package:minddeck/status_strip.dart';
 
 void main() {
-  group('formatClock', () {
-    test('is 24-hour and zero-padded on both halves', () {
-      expect(formatClock(DateTime(2026, 9, 3, 9, 5)), '09:05');
-      expect(formatClock(DateTime(2026, 9, 3, 21, 40)), '21:40');
-    });
-
-    test('midnight is 00:00, not 24:00', () {
-      expect(formatClock(DateTime(2026, 9, 3)), '00:00');
-    });
-  });
-
   group('ScreenMetrics', () {
     test('converts the measured panel into dp', () {
       // The Mind One in landscape, at the density it is expected to report.

@@ -30,7 +30,7 @@ class CardAppRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.separated(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 2),
       // The card clips, so a bouncing overscroll would reveal nothing and just
       // look loose. Clamp it.
       physics: const ClampingScrollPhysics(),

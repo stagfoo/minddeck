@@ -1,15 +1,14 @@
-/// Geometry for the overlapping card stack and the pull knob beside it.
+/// Geometry for the rolodex of cards and the pull knob beside it.
 ///
-/// The shape is a wallet: every card is drawn at full height, and they are
-/// offset by less than that so each one slides under the next. What you see of
-/// a covered card is its top strip — name and mark — with its lower half and
-/// bottom corners hidden behind the card in front. That overlap is what makes
-/// it read as a deck of cards rather than a list of coloured bars.
+/// The first card is the front of the deck and every card after it sits
+/// *behind* the one before, receding downward — so "all apps", always last, is
+/// always at the very back. Each covered card reveals its bottom strip below
+/// the card in front of it, which is why a card's name lives at its bottom
+/// edge: that strip is the only part of it you can see.
 ///
-/// The focused card is the exception: everything after it is pushed clear of
-/// its bottom edge, so it is revealed whole. The stack is clipped to its box,
-/// which is what lets the tail card run off the bottom the way a real fanned
-/// deck does.
+/// The focused card is revealed whole, and the cards in front of it slide up
+/// until their bottoms meet its top edge, so nothing overlaps it. No card ever
+/// has to be lifted out of the paint order; the positions alone do it.
 ///
 /// Pure Dart, so it can be pinned down at the exact size this phone reports.
 library;
@@ -50,14 +49,29 @@ class StackSpec {
   double get totalHeight =>
       cardCount <= 0 ? 0 : cardHeight + (cardCount - 1) * peek;
 
-  /// Top edge of card [index]. Cards up to and including the focused one are a
-  /// strip apart; everything after it starts below the focused card's bottom.
+  /// Top edge of card [index].
+  ///
+  /// From the focused card down, cards sit a strip apart and recede behind one
+  /// another. Cards in front of the focused one are pushed up so their *bottom*
+  /// edges land a strip apart, clearing the focused card entirely — the last of
+  /// them ends exactly where the focused card begins.
   double topOf(int index) {
-    final stripsAbove = index <= focusedIndex ? index : focusedIndex;
-    final stripsBelow = index <= focusedIndex ? 0 : index - focusedIndex - 1;
-    final clearsFocused = index > focusedIndex ? cardHeight : 0.0;
-    return originY + stripsAbove * peek + clearsFocused + stripsBelow * peek;
+    if (index < focusedIndex) {
+      return originY + (index + 1) * peek - cardHeight;
+    }
+    return originY + index * peek;
   }
+
+  /// Where the visible slice of card [index] starts. For a covered card that
+  /// is its bottom strip; the focused card is visible from its top.
+  double revealTopOf(int index) => index == focusedIndex
+      ? topOf(index)
+      : topOf(index) + cardHeight - peek;
+
+  /// Back-to-front paint order. The first card is the front of the deck, so it
+  /// is painted last; "all apps" is painted first and stays at the very back.
+  List<int> get paintOrder =>
+      [for (var i = cardCount - 1; i >= 0; i--) i];
 
   /// Cards are all [cardHeight]; only how much of one is visible varies.
   double heightOf(int index) => cardHeight;

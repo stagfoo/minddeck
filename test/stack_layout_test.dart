@@ -21,25 +21,85 @@ void main() {
       expect(spec.cardHeight, greaterThan(spec.peek * 2));
     });
 
-    test('covered cards overlap, revealing exactly one strip each', () {
-      // The overlap is the whole look: a covered card must show its top strip
-      // and hide its bottom corners behind the card in front.
-      final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 3);
-      for (var i = 1; i < spec.cardCount; i++) {
-        if (i == spec.focusedIndex || i == spec.focusedIndex + 1) continue;
-        expect(
-          spec.topOf(i) - spec.topOf(i - 1),
-          closeTo(spec.peek, 0.01),
-          reason: 'card $i should be one strip below card ${i - 1}',
-        );
+    test('focusing the last card still shows every strip above it', () {
+      final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 5);
+      for (var i = 0; i < 5; i++) {
+        expect(spec.revealOf(i), spec.peek, reason: 'card $i');
       }
-      expect(spec.peek, lessThan(spec.cardHeight));
+      expect(spec.revealOf(5), spec.cardHeight);
     });
 
-    test('the focused card is revealed whole, clear of the next one', () {
-      final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 3);
-      expect(spec.revealOf(3), spec.cardHeight);
-      expect(spec.topOf(4), closeTo(spec.topOf(3) + spec.cardHeight, 0.01));
+    test('every covered card reveals exactly one strip, at its bottom', () {
+      // A covered card is behind the one in front of it, so the only part of
+      // it you can see is the strip below that card's bottom edge — which is
+      // why the card's name lives down there.
+      for (final focus in [0, 3, 5]) {
+        final spec =
+            solveStack(height: stackHeight, cardCount: 6, focusedIndex: focus);
+        for (var i = 0; i < spec.cardCount; i++) {
+          if (i == focus) continue;
+          expect(
+            spec.revealTopOf(i),
+            closeTo(spec.topOf(i) + spec.cardHeight - spec.peek, 0.01),
+            reason: 'focus $focus, card $i',
+          );
+          expect(spec.revealOf(i), spec.peek, reason: 'focus $focus, card $i');
+        }
+      }
+    });
+
+    test('strips land a peek apart down the stack', () {
+      final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 0);
+      for (var i = 1; i < spec.cardCount; i++) {
+        expect(
+          spec.revealTopOf(i) - spec.revealTopOf(i - 1),
+          closeTo(i == 1 ? spec.cardHeight : spec.peek, 0.01),
+          reason: 'card $i',
+        );
+      }
+    });
+
+    test('nothing in front of the focused card overlaps it', () {
+      // Cards in front slide up until their bottoms meet its top edge, so the
+      // focused card is revealed whole without being lifted out of the stack.
+      for (final focus in [1, 3, 5]) {
+        final spec =
+            solveStack(height: stackHeight, cardCount: 6, focusedIndex: focus);
+        expect(spec.revealOf(focus), spec.cardHeight, reason: 'focus $focus');
+        for (var i = 0; i < focus; i++) {
+          expect(
+            spec.topOf(i) + spec.cardHeight,
+            lessThanOrEqualTo(spec.topOf(focus) + 0.01),
+            reason: 'card $i must clear the focused card',
+          );
+        }
+        expect(
+          spec.topOf(focus - 1) + spec.cardHeight,
+          closeTo(spec.topOf(focus), 0.01),
+        );
+      }
+    });
+
+    test('the first card is the front of the deck and all apps the back', () {
+      // Painted back to front, so the last card — always all apps — is behind
+      // everything and the first card is in front.
+      final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 0);
+      expect(spec.paintOrder.first, 5);
+      expect(spec.paintOrder.last, 0);
+      expect(spec.paintOrder, hasLength(6));
+      expect(spec.paintOrder.toSet(), {0, 1, 2, 3, 4, 5});
+    });
+
+    test('the whole deck occupies the same band wherever focus is', () {
+      for (var focus = 0; focus < 6; focus++) {
+        final spec =
+            solveStack(height: stackHeight, cardCount: 6, focusedIndex: focus);
+        final top = spec.revealTopOf(0);
+        final bottom = spec.topOf(5) + spec.cardHeight;
+        expect(top, closeTo(spec.originY, 0.01), reason: 'focus $focus');
+        expect(bottom - top, closeTo(spec.totalHeight, 0.01),
+            reason: 'focus $focus');
+      }
     });
 
     test('every card is drawn at full height, focused or not', () {
@@ -77,7 +137,11 @@ void main() {
         final spec = solveStack(height: stackHeight, cardCount: 8, focusedIndex: focus);
         expect(spec.totalHeight, lessThanOrEqualTo(stackHeight + 0.01),
             reason: 'focus $focus');
-        expect(spec.topOf(0), greaterThanOrEqualTo(-0.01), reason: 'focus $focus');
+        // The front card's body runs above the box and is clipped once
+        // anything is focused behind it; what has to stay in bounds is the
+        // strip you can actually see.
+        expect(spec.revealTopOf(0), greaterThanOrEqualTo(spec.originY - 0.01),
+            reason: 'focus $focus');
       }
     });
 
