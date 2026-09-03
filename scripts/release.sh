@@ -19,6 +19,14 @@ apk_path="build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk"
 
 echo "==> $app_name $tag"
 
+# gh release create --target takes a commit the remote already has; without
+# this the whole build runs and then fails with "target_commitish is invalid".
+if ! git ls-remote --exit-code origin "$(git rev-parse HEAD)" >/dev/null 2>&1 \
+   && [ -n "$(git log --oneline @{u}..HEAD 2>/dev/null || echo unpushed)" ]; then
+  echo "==> HEAD is not on origin yet; pushing first"
+  git push origin HEAD
+fi
+
 flutter pub get
 flutter analyze
 flutter test
