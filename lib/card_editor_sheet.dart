@@ -4,26 +4,64 @@ import 'card_deck.dart';
 import 'card_style.dart';
 import 'theme.dart';
 
-/// Name, colour and icon for one card.
+/// What the editor hands back: the edited card, and where it should sit.
+class CardEditResult {
+  const CardEditResult({
+    required this.card,
+    required this.position,
+    this.deleted = false,
+  });
+
+  final DeckCard card;
+
+  /// Index among the folder cards. Unchanged unless the position controls were
+  /// used, so the caller can skip the reorder entirely.
+  final int position;
+
+  /// The card should go. Its apps are not lost — they simply stop being filed
+  /// and reappear under all apps.
+  final bool deleted;
+}
+
+/// Name, colour, icon and position for one card.
 ///
 /// The colour is the card's whole identity in the stack, so the sheet previews
 /// the real thing at the top and updates it live as you pick — choosing from
 /// swatches alone means guessing how a colour reads behind black text.
-Future<DeckCard?> showCardEditor(BuildContext context, DeckCard card) {
-  return showModalBottomSheet<DeckCard>(
+///
+/// Reordering lives here rather than as a drag on the stack because the stack's
+/// vertical drag already means "change focus", and overloading it would make
+/// the one gesture that has to stay reliable ambiguous.
+Future<CardEditResult?> showCardEditor(
+  BuildContext context,
+  DeckCard card, {
+  required int position,
+  required int folderCount,
+}) {
+  return showModalBottomSheet<CardEditResult>(
     context: context,
     backgroundColor: DeckColors.strip,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (context) => _CardEditorSheet(card: card),
+    builder: (context) => _CardEditorSheet(
+      card: card,
+      position: position,
+      folderCount: folderCount,
+    ),
   );
 }
 
 class _CardEditorSheet extends StatefulWidget {
-  const _CardEditorSheet({required this.card});
+  const _CardEditorSheet({
+    required this.card,
+    required this.position,
+    required this.folderCount,
+  });
 
   final DeckCard card;
+  final int position;
+  final int folderCount;
 
   @override
   State<_CardEditorSheet> createState() => _CardEditorSheetState();
@@ -31,6 +69,7 @@ class _CardEditorSheet extends StatefulWidget {
 
 class _CardEditorSheetState extends State<_CardEditorSheet> {
   late DeckCard _draft = widget.card;
+  late int _position = widget.position;
   late final TextEditingController _name =
       TextEditingController(text: widget.card.name);
 
@@ -73,6 +112,10 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
                   setState(() => _draft = _draft.copyWith(name: value)),
             ),
             const SizedBox(height: 18),
+            _label('Position'),
+            const SizedBox(height: 8),
+            _position_(),
+            const SizedBox(height: 18),
             _label('Colour'),
             const SizedBox(height: 8),
             _swatches(),
@@ -81,7 +124,21 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
             const SizedBox(height: 8),
             _icons(),
             const SizedBox(height: 20),
-            SizedBox(
+            Row(
+              children: [
+                _DeleteButton(onTap: _confirmDelete),
+                const SizedBox(width: 10),
+                Expanded(child: _doneButton()),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _doneButton() {
+    return SizedBox(
               width: double.infinity,
               child: FilledButton(
                 onPressed: _save,
@@ -93,20 +150,88 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
                 child: const Text('Done',
                     style: TextStyle(fontWeight: FontWeight.w600)),
               ),
-            ),
-          ],
+            );
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: DeckColors.strip,
+        title: Text('Delete ${widget.card.name}?',
+            style: const TextStyle(color: DeckColors.text, fontSize: 17)),
+        content: const Text(
+          'Its apps are not removed — they stop being filed and show up under '
+          'all apps again.',
+          style: TextStyle(color: DeckColors.textDim, fontSize: 13),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep',
+                style: TextStyle(color: DeckColors.textDim)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete',
+                style: TextStyle(color: Color(0xFFFF6B5A))),
+          ),
+        ],
       ),
+    );
+    if (confirmed != true || !mounted) return;
+    Navigator.pop(
+      context,
+      CardEditResult(card: widget.card, position: _position, deleted: true),
     );
   }
 
   void _save() {
     final trimmed = _name.text.trim();
-    // An unnamed card is an unreadable sliver, so fall back rather than
-    // letting the stack fill with blanks.
+    // An unnamed card is an unreadable strip, so fall back rather than letting
+    // the stack fill with blanks.
     Navigator.pop(
       context,
-      _draft.copyWith(name: trimmed.isEmpty ? widget.card.name : trimmed),
+      CardEditResult(
+        card: _draft.copyWith(name: trimmed.isEmpty ? widget.card.name : trimmed),
+        position: _position,
+      ),
+    );
+  }
+
+  void _move(int delta) {
+    setState(() =>
+        _position = (_position + delta).clamp(0, widget.folderCount - 1));
+  }
+
+  /// Front of the deck is position 1, since that is how the stack reads: the
+  /// first card is the one in front.
+  Widget _position_() {
+    final canMoveUp = _position > 0;
+    final canMoveDown = _position < widget.folderCount - 1;
+    return Row(
+      children: [
+        _MoveButton(
+          icon: Icons.keyboard_arrow_up_rounded,
+          label: 'Forward',
+          enabled: canMoveUp,
+          onTap: () => _move(-1),
+        ),
+        const SizedBox(width: 10),
+        _MoveButton(
+          icon: Icons.keyboard_arrow_down_rounded,
+          label: 'Back',
+          enabled: canMoveDown,
+          onTap: () => _move(1),
+        ),
+        const Spacer(),
+        Text(
+          _position == 0
+              ? 'front of the deck'
+              : '${_position + 1} of ${widget.folderCount}',
+          style: const TextStyle(color: DeckColors.textDim, fontSize: 12),
+        ),
+      ],
     );
   }
 
@@ -218,6 +343,72 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
             ),
           ),
       ],
+    );
+  }
+}
+
+
+class _MoveButton extends StatelessWidget {
+  const _MoveButton({
+    required this.icon,
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.35,
+      child: GestureDetector(
+        onTap: enabled ? onTap : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: DeckColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: DeckColors.surfaceEdge),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: DeckColors.text),
+              const SizedBox(width: 4),
+              Text(label,
+                  style: const TextStyle(color: DeckColors.text, fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _DeleteButton extends StatelessWidget {
+  const _DeleteButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: DeckColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: DeckColors.surfaceEdge),
+        ),
+        child: const Icon(Icons.delete_outline_rounded,
+            size: 20, color: Color(0xFFFF6B5A)),
+      ),
     );
   }
 }

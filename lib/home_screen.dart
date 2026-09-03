@@ -345,9 +345,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _editCard(DeckCard card) async {
     if (card.isAllApps) return;
-    final edited = await showCardEditor(context, card);
-    if (edited == null) return;
-    await _update(_deck.updateCard(card.id, (_) => edited));
+    final position = _deck.folders.indexWhere((entry) => entry.id == card.id);
+    if (position < 0) return;
+
+    final result = await showCardEditor(
+      context,
+      card,
+      position: position,
+      folderCount: _deck.folders.length,
+    );
+    if (result == null) return;
+
+    if (result.deleted) {
+      await _deleteCard(card);
+      return;
+    }
+
+    var deck = _deck.updateCard(card.id, (_) => result.card);
+    if (result.position != position) {
+      deck = deck.reorder(position, result.position);
+    }
+    await _update(deck);
+    // Follow the card if it moved, so the deck doesn't appear to jump to a
+    // different card under the knob.
+    final moved = deck.indexOfId(card.id);
+    if (moved >= 0) setState(() => _focused = moved);
   }
 
   Future<void> _addCard() async {
@@ -356,6 +378,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final added = deck.folders.last;
     setState(() => _focused = deck.indexOfId(added.id));
     await _editCard(added);
+  }
+
+  Future<void> _deleteCard(DeckCard card) async {
+    if (card.isAllApps) return;
+    await _update(_deck.removeCard(card.id));
   }
 
   void _showMetrics() {

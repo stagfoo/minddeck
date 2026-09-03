@@ -27,7 +27,12 @@ rests there anyway. Swiping the stack and tapping the track work too.
 ## Cards
 
 - **Tap** a collapsed card to focus it; tap the focused card to open it.
-- **Hold** a card to edit its **name, colour and icon**.
+- **Hold** a card to edit its **name, colour, icon and position**, or delete it.
+  Reordering lives in that sheet rather than as a drag on the stack, because the
+  stack's vertical drag already means "change focus" and overloading it would
+  make the one gesture that has to stay reliable ambiguous.
+- Deleting a card doesn't remove its apps — they stop being filed and reappear
+  under all apps.
 - **+** in the top strip adds a card and opens the editor on it.
 - Inside **all apps**, hold an app to file it under a card. An app lives on at
   most one card — two homes would show it twice and make removing it ambiguous.
