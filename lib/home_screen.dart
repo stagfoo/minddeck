@@ -30,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   CardDeck _deck = CardDeck.normalised(const []);
   ScreenMetrics? _metrics;
   int _focused = 0;
+  final _scroll = ScrollController();
+  StackSpec? _lastSpec;
   bool _loading = true;
   bool _isDefault = true;
   StreamSubscription<String>? _packageSub;
@@ -50,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _packageSub?.cancel();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -158,45 +161,66 @@ class _HomeScreenState extends State<HomeScreen> {
                   cardCount: _deck.length,
                   focusedIndex: _focused,
                 );
-                return GestureDetector(
-                  // Swiping the stack itself moves focus too — the knob is the
-                  // deliberate affordance, not the only one.
-                  onVerticalDragEnd: (details) {
-                    final velocity = details.primaryVelocity ?? 0;
-                    if (velocity < -200) {
-                      _moveFocus(1);
-                    } else if (velocity > 200) {
-                      _moveFocus(-1);
-                    }
-                  },
+                // Kept so the knob can scroll a long deck to the card it just
+                // selected; a plain field, not setState, since this is build.
+                _lastSpec = spec;
+                final stack = SizedBox(
+                  height: spec.totalHeight,
                   child: Stack(
+                    // Cards must be free to draw their shadow onto the card
+                    // behind, and the tail card runs past the stack the way a
+                    // fanned deck does — the scroll view clips it.
+                    clipBehavior: Clip.none,
                     children: [
                       for (var i = 0; i < _deck.length; i++)
                         AnimatedPositioned(
                           key: ValueKey(_deck[i].id),
-                          duration: const Duration(milliseconds: 200),
+                          duration: const Duration(milliseconds: 220),
                           curve: Curves.easeOutCubic,
                           left: 0,
                           right: 0,
                           top: spec.topOf(i),
                           height: spec.heightOf(i),
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: DeckCardView(
-                              card: _deck[i],
-                              height: spec.heightOf(i) - 4,
-                              focused: i == spec.focusedIndex,
-                              appCount: _deck[i].isAllApps
-                                  ? _installed.length
-                                  : _deck[i].resolve(_installed).length,
-                              onTap: () => i == _focused
-                                  ? _openCard(_deck[i])
-                                  : setState(() => _focused = i),
-                              onLongPress: () => _editCard(_deck[i]),
-                            ),
+                          child: DeckCardView(
+                            card: _deck[i],
+                            height: spec.heightOf(i),
+                            focused: i == spec.focusedIndex,
+                            apps: _deck[i].resolve(_installed),
+                            totalInstalled: _installed.length,
+                            onTap: () => i == _focused
+                                ? _openCard(_deck[i])
+                                : setState(() => _focused = i),
+                            onLongPress: () => _editCard(_deck[i]),
+                            onAppTap: (app) =>
+                                LauncherBridge.instance.launch(app.packageName),
+                            onAppLongPress: (app) => _showAppMenu(_deck[i], app),
                           ),
                         ),
                     ],
+                  ),
+                );
+
+                return ClipRect(
+                  child: GestureDetector(
+                    // Swiping the stack moves focus. The app rows scroll
+                    // horizontally, so the vertical gesture stays free.
+                    onVerticalDragEnd: (details) {
+                      final velocity = details.primaryVelocity ?? 0;
+                      if (velocity < -200) {
+                        _moveFocus(1);
+                      } else if (velocity > 200) {
+                        _moveFocus(-1);
+                      }
+                    },
+                    child: spec.overflows
+                        // More cards than fit at readable sizes: scroll rather
+                        // than crush the strips until the names clip.
+                        ? SingleChildScrollView(
+                            controller: _scroll,
+                            physics: const ClampingScrollPhysics(),
+                            child: stack,
+                          )
+                        : stack,
                   ),
                 );
               },
@@ -205,10 +229,27 @@ class _HomeScreenState extends State<HomeScreen> {
           SideRail(
             cardCount: _deck.length,
             focusedIndex: _focused,
-            onFocusChanged: (index) => setState(() => _focused = index),
+            onFocusChanged: _focus,
           ),
         ],
       ),
+    );
+  }
+
+  /// Moves focus and, when the deck is long enough to scroll, brings the newly
+  /// focused card into view — otherwise the knob can select a card that is off
+  /// the bottom of the stack.
+  void _focus(int index) {
+    setState(() => _focused = index);
+    if (!_scroll.hasClients) return;
+    final spec = _lastSpec;
+    if (spec == null || !spec.overflows) return;
+    final target = (spec.topOf(index) - spec.peek)
+        .clamp(0.0, _scroll.position.maxScrollExtent);
+    _scroll.animateTo(
+      target,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
     );
   }
 
@@ -229,6 +270,73 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (chosen != null) {
       await LauncherBridge.instance.launch(chosen.packageName);
+    }
+  }
+
+  /// Filing an app straight from the card it is sitting on, so the common
+  /// case never needs the all-apps screen.
+  Future<void> _showAppMenu(DeckCard from, LaunchableApp app) async {
+    final target = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: DeckColors.strip,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title:
+                  Text(app.label, style: const TextStyle(color: DeckColors.text)),
+              subtitle: Text(
+                app.packageName,
+                style: const TextStyle(color: DeckColors.textDim, fontSize: 11),
+              ),
+            ),
+            const Divider(height: 1, color: DeckColors.surfaceEdge),
+            if (!from.isAllApps)
+              ListTile(
+                leading: const Icon(Icons.remove_circle_outline,
+                    color: DeckColors.textDim),
+                title: Text('Remove from ${from.name}',
+                    style: const TextStyle(color: DeckColors.text)),
+                onTap: () => Navigator.pop(context, '__remove__'),
+              ),
+            for (final option in _deck.folders)
+              if (option.id != from.id)
+                ListTile(
+                  leading: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: colorOf(option.colorKey),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(iconOf(option.iconKey),
+                        size: 13, color: DeckColors.onCard),
+                  ),
+                  title: Text('Move to ${option.name}',
+                      style: const TextStyle(color: DeckColors.text)),
+                  onTap: () => Navigator.pop(context, option.id),
+                ),
+            ListTile(
+              leading: const Icon(Icons.info_outline, color: DeckColors.textDim),
+              title: const Text('App info',
+                  style: TextStyle(color: DeckColors.text)),
+              onTap: () => Navigator.pop(context, '__info__'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (target == null) return;
+    switch (target) {
+      case '__remove__':
+        await _update(_deck.unassign(app.id));
+      case '__info__':
+        await LauncherBridge.instance.openAppInfo(app.packageName);
+      default:
+        await _update(_deck.assign(app.id, target));
     }
   }
 

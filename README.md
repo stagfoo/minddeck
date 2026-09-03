@@ -3,9 +3,17 @@
 A portrait card-stack home launcher for the **iKKO Mind One** — a card-sized
 Android 15 phone with a 1080 × 1240 panel.
 
-Each card is a coloured folder. The stack is always fully on screen: one card
-open, the rest collapsed to slivers above and below it. The last card is
-**all apps** and can't be moved or deleted.
+Each card is a coloured folder holding a sideways-scrolling row of apps. The
+cards **overlap** like a wallet: every card is drawn full height and offset by
+less than that, so each one slides under the next and you see its top strip —
+name, count, mark — with its lower half and bottom corners hidden behind the
+card in front. The focused card is the exception: everything after it is pushed
+clear of its bottom edge, so it's revealed whole. The last card is **all apps**
+and can't be moved or deleted.
+
+Apps live **on** the card, in a row you scroll sideways. Sideways rather than a
+wrapped grid because a card is wide and short, and because it keeps the vertical
+gesture free for the stack — the one that has to stay reliable.
 
 The phone has no scroll wheel, so the deck gets a **pull knob** down the right
 edge instead — a ridged grip on a recessed track that you drag up and down,
@@ -33,17 +41,18 @@ colours this one doesn't know still opens rather than crashing.
 
 ## Fitting the panel
 
-`solveStack` fits the whole deck into whatever height it's given: it holds the
-open card at a comfortable size and shrinks the slivers, and only when slivers
-would get unreadable does it take height off the open card instead. Overflow
-would be a bug — the point of the shape is that the deck is always fully
-visible.
+`solveStack` fits the deck into whatever height it's given: it squeezes the
+strips first, then the card, because a slightly shorter card costs less than
+strips too thin to read a name in. Both have floors — the strip's floor is the
+card header, since the strip is *all you see* of a covered card. When even
+those don't fit, the stack reports that it overflows and scrolls, rather than
+crushing the strips until the labels clip.
 
-| Density | Portrait dp | 6 cards | 9 cards |
+| Density | Box | 7 cards | 9 cards |
 | --- | --- | --- | --- |
-| 2.5× | 432 × 496 | 150dp open, 42dp slivers | 150 / 36 |
-| 2.75× | 393 × 451 | 150dp open, 42dp slivers | 150 / 31 |
-| 3.0× | 360 × 413 | 150dp open, 41dp slivers | 149 / 26 |
+| 2.5× | 440dp | 158dp card, 44dp strips | 158 / 35 |
+| 2.75× | 395dp | 158dp card, 39dp strips | 139 / 32 |
+| 3.0× | 357dp | 158dp card, 33dp strips | scrolls |
 
 Which density is real depends on what the phone reports. **Long-press the
 clock** and it tells you — measured, not assumed. `StackStyle` in

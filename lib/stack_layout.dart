@@ -1,10 +1,15 @@
-/// Geometry for the card stack and the pull knob beside it.
+/// Geometry for the overlapping card stack and the pull knob beside it.
 ///
-/// The stack is the rabbitOS shape: one focused card open to full height, the
-/// rest collapsed to a title-bar sliver below and above it, overlapping so the
-/// whole deck stays on screen without scrolling. The knob is the substitute
-/// for the scroll wheel this phone doesn't have — a track down the right edge
-/// with a grip you drag to move focus.
+/// The shape is a wallet: every card is drawn at full height, and they are
+/// offset by less than that so each one slides under the next. What you see of
+/// a covered card is its top strip — name and mark — with its lower half and
+/// bottom corners hidden behind the card in front. That overlap is what makes
+/// it read as a deck of cards rather than a list of coloured bars.
+///
+/// The focused card is the exception: everything after it is pushed clear of
+/// its bottom edge, so it is revealed whole. The stack is clipped to its box,
+/// which is what lets the tail card run off the bottom the way a real fanned
+/// deck does.
 ///
 /// Pure Dart, so it can be pinned down at the exact size this phone reports.
 library;
@@ -12,60 +17,83 @@ library;
 class StackSpec {
   const StackSpec({
     required this.peek,
-    required this.focusedHeight,
+    required this.cardHeight,
     required this.cardCount,
     required this.focusedIndex,
     required this.originY,
+    required this.boxHeight,
   });
 
-  /// Visible slice of a collapsed card — enough for its icon and name.
+  /// How much of a covered card stays visible: its top strip.
   final double peek;
 
-  /// Height of the one open card.
-  final double focusedHeight;
+  /// Every card is drawn this tall, focused or not — the covered ones are
+  /// simply overlapped. Laying collapsed cards out at sliver height instead is
+  /// what made them bars, and made their contents overflow.
+  final double cardHeight;
 
   final int cardCount;
   final int focusedIndex;
 
-  /// Top of the stack, so it sits centred when the deck is short.
+  /// Top of the stack, so a short deck sits centred.
   final double originY;
 
-  double get totalHeight =>
-      cardCount <= 0 ? 0 : focusedHeight + (cardCount - 1) * peek;
+  /// Height the stack was asked to fit into. When [totalHeight] exceeds it
+  /// there are more cards than the box can hold at readable sizes, and the
+  /// stack scrolls rather than crushing the strips.
+  final double boxHeight;
 
-  /// Top edge of the card at [index]. Cards above the focused one are stacked
-  /// at [peek] intervals; everything below is pushed down by the open card.
+  bool get overflows => totalHeight > boxHeight + 0.01;
+
+  /// Total revealed height. The focused card is seen whole, everything else
+  /// contributes its strip.
+  double get totalHeight =>
+      cardCount <= 0 ? 0 : cardHeight + (cardCount - 1) * peek;
+
+  /// Top edge of card [index]. Cards up to and including the focused one are a
+  /// strip apart; everything after it starts below the focused card's bottom.
   double topOf(int index) {
-    final above = index <= focusedIndex ? index : focusedIndex;
-    final below = index <= focusedIndex ? 0 : index - focusedIndex - 1;
-    return originY + above * peek + (index > focusedIndex ? focusedHeight : 0) + below * peek;
+    final stripsAbove = index <= focusedIndex ? index : focusedIndex;
+    final stripsBelow = index <= focusedIndex ? 0 : index - focusedIndex - 1;
+    final clearsFocused = index > focusedIndex ? cardHeight : 0.0;
+    return originY + stripsAbove * peek + clearsFocused + stripsBelow * peek;
   }
 
-  double heightOf(int index) => index == focusedIndex ? focusedHeight : peek;
+  /// Cards are all [cardHeight]; only how much of one is visible varies.
+  double heightOf(int index) => cardHeight;
+
+  /// What the eye actually gets of card [index].
+  double revealOf(int index) => index == focusedIndex ? cardHeight : peek;
 }
 
 class StackStyle {
   const StackStyle({
-    this.preferredPeek = 42,
-    this.minPeek = 26,
-    this.preferredFocusedHeight = 150,
-    this.minFocusedHeight = 92,
+    this.preferredPeek = 44,
+    this.minPeek = 32,
+    this.preferredCardHeight = 158,
+    this.minCardHeight = 108,
   });
 
   final double preferredPeek;
+
+  /// Never let the strip shrink below the card header, or the name in it gets
+  /// clipped — which is exactly the overflow the first build shipped.
   final double minPeek;
-  final double preferredFocusedHeight;
-  final double minFocusedHeight;
+
+  final double preferredCardHeight;
+  final double minCardHeight;
 
   static const standard = StackStyle();
+
+  /// The fixed top strip of a card: name on the left, mark on the right. Kept
+  /// here because it is the floor [minPeek] has to respect.
+  static const headerHeight = 32.0;
 }
 
-/// Fits [cardCount] cards into [height], shrinking the collapsed slivers first
-/// and the open card only if that isn't enough.
+/// Fits [cardCount] overlapping cards into [height].
 ///
-/// Never returns a stack taller than the box: the whole point of the shape is
-/// that the deck is always fully visible, so overflow would be a bug rather
-/// than something to scroll.
+/// Squeezes the strips first, then the card itself, because a slightly shorter
+/// card costs less than strips too thin to read a name in.
 StackSpec solveStack({
   required double height,
   required int cardCount,
@@ -75,45 +103,50 @@ StackSpec solveStack({
   if (cardCount <= 0) {
     return StackSpec(
       peek: style.preferredPeek,
-      focusedHeight: style.preferredFocusedHeight,
+      cardHeight: style.preferredCardHeight,
       cardCount: 0,
       focusedIndex: 0,
       originY: 0,
+      boxHeight: height,
     );
   }
 
   final safeIndex = focusedIndex.clamp(0, cardCount - 1);
-  final collapsed = cardCount - 1;
+  final strips = cardCount - 1;
 
-  var focusedHeight = style.preferredFocusedHeight;
+  var cardHeight = style.preferredCardHeight;
   var peek = style.preferredPeek;
 
-  if (collapsed > 0) {
-    final spare = height - focusedHeight;
-    final fitted = spare / collapsed;
+  if (strips > 0) {
+    final spare = height - cardHeight;
+    final fitted = spare / strips;
     if (fitted < peek) peek = fitted;
+
+    if (peek < style.minPeek) {
+      peek = style.minPeek;
+      cardHeight = height - strips * peek;
+
+      // If the card would now be below its floor there are simply more cards
+      // than fit. Both floors hold and the stack overflows, to be scrolled —
+      // strips too thin to read a name in are not a trade worth making, and
+      // that crushing is what clipped the labels on the device.
+      cardHeight = cardHeight.clamp(style.minCardHeight, double.infinity);
+    }
   }
 
-  if (peek < style.minPeek) {
-    // Too many cards for comfortable slivers: hold the sliver at its minimum
-    // and take the difference out of the open card instead, which degrades
-    // more gracefully than unreadable slivers.
-    peek = style.minPeek;
-    focusedHeight = height - collapsed * peek;
-  }
-
-  focusedHeight = focusedHeight.clamp(style.minFocusedHeight, double.infinity);
+  cardHeight = cardHeight.clamp(style.minCardHeight, double.infinity);
   peek = peek.clamp(1.0, double.infinity);
 
-  final total = focusedHeight + collapsed * peek;
+  final total = cardHeight + strips * peek;
   final originY = total >= height ? 0.0 : (height - total) / 2;
 
   return StackSpec(
     peek: peek,
-    focusedHeight: focusedHeight,
+    cardHeight: cardHeight,
     cardCount: cardCount,
     focusedIndex: safeIndex,
     originY: originY,
+    boxHeight: height,
   );
 }
 

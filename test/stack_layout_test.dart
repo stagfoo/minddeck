@@ -11,31 +11,65 @@ void main() {
       final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 0);
       expect(spec.totalHeight, lessThanOrEqualTo(stackHeight + 0.01));
       expect(spec.peek, greaterThanOrEqualTo(StackStyle.standard.minPeek));
+      expect(spec.cardHeight, greaterThan(spec.peek));
     });
 
-    test('the open card is much taller than a collapsed sliver', () {
+    test('the open card reveals much more than a covered strip', () {
       final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 2);
-      expect(spec.heightOf(2), spec.focusedHeight);
-      expect(spec.heightOf(0), spec.peek);
-      expect(spec.focusedHeight, greaterThan(spec.peek * 2));
+      expect(spec.revealOf(2), spec.cardHeight);
+      expect(spec.revealOf(0), spec.peek);
+      expect(spec.cardHeight, greaterThan(spec.peek * 2));
     });
 
-    test('cards never overlap: each starts where the last one ends', () {
+    test('covered cards overlap, revealing exactly one strip each', () {
+      // The overlap is the whole look: a covered card must show its top strip
+      // and hide its bottom corners behind the card in front.
       final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 3);
       for (var i = 1; i < spec.cardCount; i++) {
+        if (i == spec.focusedIndex || i == spec.focusedIndex + 1) continue;
         expect(
-          spec.topOf(i),
-          closeTo(spec.topOf(i - 1) + spec.heightOf(i - 1), 0.01),
-          reason: 'card $i should follow card ${i - 1}',
+          spec.topOf(i) - spec.topOf(i - 1),
+          closeTo(spec.peek, 0.01),
+          reason: 'card $i should be one strip below card ${i - 1}',
         );
+      }
+      expect(spec.peek, lessThan(spec.cardHeight));
+    });
+
+    test('the focused card is revealed whole, clear of the next one', () {
+      final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 3);
+      expect(spec.revealOf(3), spec.cardHeight);
+      expect(spec.topOf(4), closeTo(spec.topOf(3) + spec.cardHeight, 0.01));
+    });
+
+    test('every card is drawn at full height, focused or not', () {
+      // Laying collapsed cards out at strip height is what made them bars and
+      // overflowed their contents by two pixels on the device.
+      final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 0);
+      for (var i = 0; i < spec.cardCount; i++) {
+        expect(spec.heightOf(i), spec.cardHeight, reason: 'card $i');
       }
     });
 
-    test('the last card ends inside the box', () {
-      final spec = solveStack(height: stackHeight, cardCount: 8, focusedIndex: 7);
-      final last = spec.cardCount - 1;
-      expect(spec.topOf(last) + spec.heightOf(last),
-          lessThanOrEqualTo(stackHeight + 0.01));
+    test('a strip is always tall enough for the card header', () {
+      // The header holds the card's name; a strip shorter than it clips the
+      // name, which is exactly the bug the first build shipped.
+      for (final count in [2, 6, 9, 12]) {
+        final spec = solveStack(
+            height: stackHeight, cardCount: count, focusedIndex: 0);
+        expect(spec.peek, greaterThanOrEqualTo(StackStyle.headerHeight - 0.01),
+            reason: '$count cards');
+      }
+    });
+
+    test('the revealed stack fits the box whatever is focused', () {
+      for (var focus = 0; focus < 8; focus++) {
+        final spec =
+            solveStack(height: stackHeight, cardCount: 8, focusedIndex: focus);
+        expect(spec.totalHeight, lessThanOrEqualTo(stackHeight + 0.01),
+            reason: 'focus $focus');
+        expect(spec.overflows, isFalse, reason: 'focus $focus');
+      }
     });
 
     test('holds together wherever focus is', () {
@@ -53,13 +87,21 @@ void main() {
       expect(spec.originY, closeTo((stackHeight - spec.totalHeight) / 2, 0.01));
     });
 
-    test('a crowded deck keeps slivers readable, shrinking the open card', () {
-      // Twenty cards can't all have a comfortable sliver; better a smaller open
-      // card than slivers too thin to read.
+    test('a crowded deck overflows to be scrolled, it does not crush strips', () {
+      // Twenty cards do not fit at readable sizes. Both floors hold and the
+      // stack reports that it overflows; thinning the strips until names clip
+      // is not a trade worth making.
       final spec = solveStack(height: stackHeight, cardCount: 20, focusedIndex: 0);
-      expect(spec.peek, greaterThanOrEqualTo(StackStyle.standard.minPeek - 0.01));
-      expect(spec.focusedHeight,
-          greaterThanOrEqualTo(StackStyle.standard.minFocusedHeight - 0.01));
+      expect(spec.cardHeight,
+          greaterThanOrEqualTo(StackStyle.standard.minCardHeight - 0.01));
+      expect(spec.peek,
+          greaterThanOrEqualTo(StackStyle.standard.minPeek - 0.01));
+      expect(spec.overflows, isTrue);
+    });
+
+    test('a deck that fits does not claim to overflow', () {
+      final spec = solveStack(height: stackHeight, cardCount: 6, focusedIndex: 0);
+      expect(spec.overflows, isFalse);
     });
   });
 
@@ -69,10 +111,10 @@ void main() {
       expect(spec.totalHeight, 0);
     });
 
-    test('a single card fills as the open card', () {
+    test('a single card is the whole stack', () {
       final spec = solveStack(height: stackHeight, cardCount: 1, focusedIndex: 0);
-      expect(spec.totalHeight, spec.focusedHeight);
-      expect(spec.heightOf(0), spec.focusedHeight);
+      expect(spec.totalHeight, spec.cardHeight);
+      expect(spec.revealOf(0), spec.cardHeight);
     });
 
     test('an out-of-range focus is clamped, not thrown', () {
@@ -83,7 +125,7 @@ void main() {
     test('a zero-height box still yields positive card heights', () {
       final spec = solveStack(height: 0, cardCount: 5, focusedIndex: 0);
       expect(spec.peek, greaterThan(0));
-      expect(spec.focusedHeight, greaterThan(0));
+      expect(spec.cardHeight, greaterThan(0));
     });
   });
 
