@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'card_deck.dart';
+import 'app_menu_sheet.dart';
 import 'card_editor_sheet.dart';
 import 'deck_card_view.dart';
 import 'deck_store.dart';
@@ -456,70 +457,24 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  /// Filing an app straight from the card it is sitting on, so the common
-  /// case never needs the all-apps screen.
+  /// Filing an app straight from the card it is sitting on, so the common case
+  /// never needs the all-apps screen.
   Future<void> _showAppMenu(DeckCard from, LaunchableApp app) async {
-    final target = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: DeckColors.strip,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title:
-                  Text(app.label, style: const TextStyle(color: DeckColors.text)),
-              subtitle: Text(
-                app.packageName,
-                style: const TextStyle(color: DeckColors.textDim, fontSize: 11),
-              ),
-            ),
-            const Divider(height: 1, color: DeckColors.surfaceEdge),
-            if (!from.isAllApps)
-              ListTile(
-                leading: const Icon(Icons.remove_circle_outline,
-                    color: DeckColors.textDim),
-                title: Text('Remove from ${from.name}',
-                    style: const TextStyle(color: DeckColors.text)),
-                onTap: () => Navigator.pop(context, '__remove__'),
-              ),
-            for (final option in _deck.folders)
-              if (option.id != from.id)
-                ListTile(
-                  leading: Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: colorOf(option.colorKey),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(iconOf(option.iconKey),
-                        size: 13, color: DeckColors.onCard),
-                  ),
-                  title: Text('Move to ${option.name}',
-                      style: const TextStyle(color: DeckColors.text)),
-                  onTap: () => Navigator.pop(context, option.id),
-                ),
-            ListTile(
-              leading: const Icon(Icons.info_outline, color: DeckColors.textDim),
-              title: const Text('App info',
-                  style: TextStyle(color: DeckColors.text)),
-              onTap: () => Navigator.pop(context, '__info__'),
-            ),
-          ],
-        ),
-      ),
+    final choice = await showAppMenuSheet(
+      context,
+      app: app,
+      deck: _deck,
+      from: from,
     );
-
-    if (target == null) return;
-    switch (target) {
-      case '__remove__':
+    switch (choice) {
+      case null:
+        return;
+      case UnfileApp():
         await _update(_deck.unassign(app.id));
-      case '__info__':
+      case ShowAppInfo():
         await LauncherBridge.instance.openAppInfo(app.packageName);
-      default:
-        await _update(_deck.assign(app.id, target));
+      case FileUnder(:final cardId):
+        await _update(_deck.assign(app.id, cardId));
     }
   }
 

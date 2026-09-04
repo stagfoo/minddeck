@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'app_menu_sheet.dart';
 import 'app_tile.dart';
 import 'card_deck.dart';
+import 'launcher_bridge.dart';
 import 'models.dart';
 import 'theme.dart';
 
@@ -153,60 +155,21 @@ class _FolderScreenState extends State<FolderScreen> {
   }
 
   Future<void> _showAppMenu(LaunchableApp app) async {
-    final card = _card;
-    final target = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: DeckColors.strip,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text(app.label,
-                  style: const TextStyle(color: DeckColors.text)),
-              subtitle: Text(
-                app.packageName,
-                style: const TextStyle(color: DeckColors.textDim, fontSize: 11),
-              ),
-            ),
-            const Divider(height: 1, color: DeckColors.surfaceEdge),
-            if (!card.isAllApps)
-              ListTile(
-                leading: const Icon(Icons.remove_circle_outline,
-                    color: DeckColors.textDim),
-                title: Text('Remove from ${card.name}',
-                    style: const TextStyle(color: DeckColors.text)),
-                onTap: () => Navigator.pop(context, '__remove__'),
-              ),
-            for (final option in _deck.folders)
-              if (option.id != card.id || card.isAllApps)
-                ListTile(
-                  leading: Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: colorOf(option.colorKey),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(iconOf(option.iconKey),
-                        size: 13, color: DeckColors.onCard),
-                  ),
-                  title: Text('File under ${option.name}',
-                      style: const TextStyle(color: DeckColors.text)),
-                  trailing: _deck.cardIdFor(app.id) == option.id
-                      ? const Icon(Icons.check, size: 16, color: DeckColors.textDim)
-                      : null,
-                  onTap: () => Navigator.pop(context, option.id),
-                ),
-          ],
-        ),
-      ),
+    final choice = await showAppMenuSheet(
+      context,
+      app: app,
+      deck: _deck,
+      from: _card,
     );
-
-    if (target == null) return;
-    _update(target == '__remove__'
-        ? _deck.unassign(app.id)
-        : _deck.assign(app.id, target));
+    switch (choice) {
+      case null:
+        return;
+      case UnfileApp():
+        _update(_deck.unassign(app.id));
+      case ShowAppInfo():
+        await LauncherBridge.instance.openAppInfo(app.packageName);
+      case FileUnder(:final cardId):
+        _update(_deck.assign(app.id, cardId));
+    }
   }
 }
