@@ -105,16 +105,38 @@ const Map<String, String> legacyIconKeys = {
   'tools': 'build',
 };
 
-/// The colour for [key], falling back to the first entry rather than throwing:
-/// a stored deck from an older palette must still open.
+/// A colour key is either a palette name or a `#rrggbb` literal from the custom
+/// picker. Keeping both in one string means storage, and everything that passes
+/// a colour around, stays unchanged.
+bool isCustomColorKey(String key) => customColorValue(key) != null;
+
+/// The ARGB value a `#rrggbb` (or `#aarrggbb`) key names, or null if [key] is
+/// not one.
+int? customColorValue(String key) {
+  if (!key.startsWith('#')) return null;
+  final digits = key.substring(1);
+  if (digits.length != 6 && digits.length != 8) return null;
+  final parsed = int.tryParse(digits, radix: 16);
+  if (parsed == null) return null;
+  return digits.length == 6 ? 0xFF000000 | parsed : parsed;
+}
+
+String customColorKey(int argb) =>
+    '#${(argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+
+/// The colour for [key], falling back to the first palette entry rather than
+/// throwing: a stored deck from an older palette must still open.
 CardColor colorForKey(String key) {
+  final custom = customColorValue(key);
+  if (custom != null) return CardColor(key, 'Custom', custom);
   for (final color in cardPalette) {
     if (color.key == key) return color;
   }
   return cardPalette.first;
 }
 
-bool isKnownColorKey(String key) => cardPalette.any((color) => color.key == key);
+bool isKnownColorKey(String key) =>
+    isCustomColorKey(key) || cardPalette.any((color) => color.key == key);
 
 /// Normalises an icon key: translates a legacy name, accepts anything in the
 /// catalogue, and falls back for anything else — so a deck written by a future

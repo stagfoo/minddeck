@@ -17,9 +17,13 @@ class DeckColors {
   static const text = Color(0xFFF4F4F7);
   static const textDim = Color(0xFF83838F);
 
-  /// Text and glyphs sitting on a card. The palette is chosen so black always
-  /// reads, which is what keeps the stack looking like one thing.
+  /// Text and glyphs on a palette card. Every palette colour is chosen so black
+  /// reads on it, which is what keeps the stack looking like one thing. Custom
+  /// colours are not chosen — see [onCardFor], which picks per colour.
   static const onCard = Color(0xFF0A0A0C);
+
+  /// The light counterpart, for a custom colour too dark to take black.
+  static const onCardLight = Color(0xFFF7F7FA);
 }
 
 class DeckMetrics {
@@ -34,6 +38,23 @@ class DeckMetrics {
 }
 
 Color colorOf(String key) => Color(colorForKey(key).value);
+
+/// What to draw on top of [background].
+///
+/// The twelve palette colours were all picked to take black, so this only ever
+/// changes its mind for a custom one. Letting the picker offer any colour
+/// without this would let someone choose a navy card and lose the card's own
+/// name into it.
+///
+/// The threshold is the WCAG contrast crossover: black wins on a background
+/// whose relative luminance is above about 0.179, white below it.
+Color onCardFor(Color background) =>
+    background.computeLuminance() > 0.179
+        ? DeckColors.onCard
+        : DeckColors.onCardLight;
+
+/// [onCardFor] for a stored key.
+Color onCardForKey(String key) => onCardFor(colorOf(key));
 
 /// Glyph for a stored icon key.
 ///

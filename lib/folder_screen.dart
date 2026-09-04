@@ -106,6 +106,7 @@ class _FolderScreenState extends State<FolderScreen> {
   }
 
   Widget _header(DeckCard card, Color color) {
+    final onCard = onCardFor(color);
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 10, 14, 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -117,16 +118,15 @@ class _FolderScreenState extends State<FolderScreen> {
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back_rounded,
-                size: 22, color: DeckColors.onCard),
+            child: Icon(Icons.arrow_back_rounded, size: 22, color: onCard),
           ),
           const SizedBox(width: 10),
-          Icon(iconOf(card.iconKey), size: 19, color: DeckColors.onCard),
+          Icon(iconOf(card.iconKey), size: 19, color: onCard),
           const Spacer(),
           Text(
             card.name,
-            style: const TextStyle(
-              color: DeckColors.onCard,
+            style: TextStyle(
+              color: onCard,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),

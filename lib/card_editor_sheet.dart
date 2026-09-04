@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'card_deck.dart';
 import 'card_style.dart';
+import 'color_picker_screen.dart';
 import 'icon_picker_screen.dart';
 import 'theme.dart';
 
@@ -141,7 +142,7 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
                 onPressed: _save,
                 style: FilledButton.styleFrom(
                   backgroundColor: colorOf(_draft.colorKey),
-                  foregroundColor: DeckColors.onCard,
+                  foregroundColor: onCardForKey(_draft.colorKey),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text('Done',
@@ -218,7 +219,8 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
-          Icon(iconOf(_draft.iconKey), size: 19, color: DeckColors.onCard),
+          Icon(iconOf(_draft.iconKey),
+              size: 19, color: onCardForKey(_draft.colorKey)),
           const Spacer(),
           Flexible(
             child: Text(
@@ -226,8 +228,8 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: DeckColors.onCard,
+              style: TextStyle(
+                color: onCardForKey(_draft.colorKey),
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
@@ -238,11 +240,51 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
     );
   }
 
+  Future<void> _pickColor() async {
+    final picked = await showColorPicker(
+      context,
+      current: _draft.colorKey,
+      cardName: _draft.name.trim().isEmpty ? widget.card.name : _draft.name,
+      iconKey: _draft.iconKey,
+    );
+    if (picked != null) setState(() => _draft = _draft.copyWith(colorKey: picked));
+  }
+
   Widget _swatches() {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       children: [
+        // Presets for the usual case, the full picker for any other colour —
+        // the same shape as the icons.
+        GestureDetector(
+          onTap: _pickColor,
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(
+                color: isCustomColorKey(_draft.colorKey)
+                    ? DeckColors.text
+                    : DeckColors.surfaceEdge,
+                width: isCustomColorKey(_draft.colorKey) ? 2.5 : 1,
+              ),
+              gradient: const SweepGradient(
+                colors: [
+                  Color(0xFFFF2BB5),
+                  Color(0xFFFF9A0E),
+                  Color(0xFF2BE04B),
+                  Color(0xFF3FE3F0),
+                  Color(0xFF8E8CF8),
+                  Color(0xFFFF2BB5),
+                ],
+              ),
+            ),
+            child: Icon(Icons.colorize_rounded,
+                size: 18, color: DeckColors.onCard),
+          ),
+        ),
         for (final color in cardPalette)
           GestureDetector(
             onTap: () =>
@@ -262,8 +304,8 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
                 ),
               ),
               child: _draft.colorKey == color.key
-                  ? const Icon(Icons.check_rounded,
-                      size: 20, color: DeckColors.onCard)
+                  ? Icon(Icons.check_rounded,
+                      size: 20, color: onCardFor(Color(color.value)))
                   : null,
             ),
           ),
@@ -323,7 +365,7 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
                 iconOf(key),
                 size: 20,
                 color: _draft.iconKey == key
-                    ? DeckColors.onCard
+                    ? onCardForKey(_draft.colorKey)
                     : DeckColors.textDim,
               ),
             ),

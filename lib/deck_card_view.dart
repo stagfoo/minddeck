@@ -77,6 +77,7 @@ class DeckCardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = colorOf(card.colorKey);
+    final onCard = onCardFor(color);
     final card_ = GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -108,8 +109,8 @@ class DeckCardView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: arranging ? const SizedBox() : _body(color)),
-              _nameStrip(),
+              Expanded(child: arranging ? const SizedBox() : _body(color, onCard)),
+              _nameStrip(onCard),
             ],
           ),
         ),
@@ -121,7 +122,7 @@ class DeckCardView extends StatelessWidget {
   }
 
   /// The strip that stays visible when this card is covered.
-  Widget _nameStrip() {
+  Widget _nameStrip(onCard) {
     return SizedBox(
       height: StackStyle.headerHeight,
       child: Padding(
@@ -136,7 +137,7 @@ class DeckCardView extends StatelessWidget {
                 style: deckText(
                   size: 16,
                   weight: 700,
-                  color: DeckColors.onCard,
+                  color: onCard,
                   letterSpacing: -0.3,
                   height: 1.1,
                 ),
@@ -148,7 +149,7 @@ class DeckCardView extends StatelessWidget {
               style: deckText(
                 size: 12,
                 weight: 700,
-                color: DeckColors.onCard.withValues(alpha: 0.5),
+                color: onCard.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(width: 8),
@@ -157,7 +158,7 @@ class DeckCardView extends StatelessWidget {
                   ? Icons.drag_indicator_rounded
                   : iconOf(card.iconKey),
               size: 17,
-              color: DeckColors.onCard,
+              color: onCard,
             ),
           ],
         ),
@@ -165,7 +166,7 @@ class DeckCardView extends StatelessWidget {
     );
   }
 
-  Widget _body(Color color) {
+  Widget _body(Color color, Color onCard) {
     if (apps.isEmpty) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
@@ -176,7 +177,7 @@ class DeckCardView extends StatelessWidget {
             style: deckText(
               size: 12,
               weight: 500,
-              color: DeckColors.onCard.withValues(alpha: 0.5),
+              color: onCard.withValues(alpha: 0.5),
             ),
           ),
         ),

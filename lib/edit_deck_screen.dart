@@ -114,6 +114,7 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
 
   Widget _cardRow(DeckCard card, int index) {
     final color = colorOf(card.colorKey);
+    final onCard = onCardFor(color);
     final apps = card.resolve(widget.installed);
 
     return Padding(
@@ -141,14 +142,14 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                   children: [
                     ReorderableDragStartListener(
                       index: index,
-                      child: const Padding(
+                      child: Padding(
                         // Generous padding: the handle is the only way to move a
                         // card, so it has to be an easy target.
-                        padding: EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(8),
                         child: Icon(
                           Icons.drag_indicator_rounded,
                           size: 20,
-                          color: DeckColors.onCard,
+                          color: onCard,
                         ),
                       ),
                     ),
@@ -157,8 +158,8 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                         card.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: DeckColors.onCard,
+                        style: TextStyle(
+                          color: onCard,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
@@ -168,13 +169,13 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                     Icon(
                       iconOf(card.iconKey),
                       size: 17,
-                      color: DeckColors.onCard,
+                      color: onCard,
                     ),
                     const SizedBox(width: 6),
                     Icon(
                       Icons.edit_rounded,
                       size: 14,
-                      color: DeckColors.onCard.withValues(alpha: 0.55),
+                      color: onCard.withValues(alpha: 0.55),
                     ),
                   ],
                 ),
@@ -186,10 +187,10 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                   children: [
                     for (final app in apps) ...[
-                      _AppChip(app: app, onTap: () => _unfile(app)),
+                      _AppChip(app: app, onCard: onCard, onTap: () => _unfile(app)),
                       const SizedBox(width: 8),
                     ],
-                    _AddChip(onTap: () => _addApps(card)),
+                    _AddChip(onCard: onCard, onTap: () => _addApps(card)),
                   ],
                 ),
               ),
@@ -203,6 +204,7 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
   /// All apps is the back of the deck: no handle, no +, nothing to file.
   Widget _allAppsRow() {
     final card = _deck.cards.last;
+    final onCard = onCardForKey(card.colorKey);
     return Opacity(
       opacity: 0.5,
       child: Container(
@@ -216,8 +218,8 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
             Expanded(
               child: Text(
                 '${card.name} · always last',
-                style: const TextStyle(
-                  color: DeckColors.onCard,
+                style: TextStyle(
+                  color: onCard,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
@@ -226,13 +228,13 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
             Text(
               '${widget.installed.length}',
               style: TextStyle(
-                color: DeckColors.onCard.withValues(alpha: 0.6),
+                color: onCard.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(width: 8),
-            Icon(iconOf(card.iconKey), size: 17, color: DeckColors.onCard),
+            Icon(iconOf(card.iconKey), size: 17, color: onCard),
           ],
         ),
       ),
@@ -275,9 +277,14 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
 }
 
 class _AppChip extends StatelessWidget {
-  const _AppChip({required this.app, required this.onTap});
+  const _AppChip({
+    required this.app,
+    required this.onCard,
+    required this.onTap,
+  });
 
   final LaunchableApp app;
+  final Color onCard;
   final VoidCallback onTap;
 
   @override
@@ -293,7 +300,7 @@ class _AppChip extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: DeckColors.onCard.withValues(alpha: 0.16),
+                color: onCard.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(11),
               ),
               clipBehavior: Clip.antiAlias,
@@ -301,7 +308,7 @@ class _AppChip extends StatelessWidget {
               child: AppIconImage(
                 packageName: app.packageName,
                 size: 32,
-                color: DeckColors.onCard.withValues(alpha: 0.5),
+                color: onCard.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(height: 3),
@@ -314,7 +321,7 @@ class _AppChip extends StatelessWidget {
                 fontSize: 9,
                 height: 1.1,
                 fontWeight: FontWeight.w600,
-                color: DeckColors.onCard.withValues(alpha: 0.72),
+                color: onCard.withValues(alpha: 0.72),
               ),
             ),
           ],
@@ -325,7 +332,9 @@ class _AppChip extends StatelessWidget {
 }
 
 class _AddChip extends StatelessWidget {
-  const _AddChip({required this.onTap});
+  const _AddChip({required this.onCard, required this.onTap});
+
+  final Color onCard;
 
   final VoidCallback onTap;
 
@@ -344,14 +353,14 @@ class _AddChip extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(11),
                 border: Border.all(
-                  color: DeckColors.onCard.withValues(alpha: 0.45),
+                  color: onCard.withValues(alpha: 0.45),
                   width: 1.5,
                 ),
               ),
               child: Icon(
                 Icons.add_rounded,
                 size: 22,
-                color: DeckColors.onCard.withValues(alpha: 0.75),
+                color: onCard.withValues(alpha: 0.75),
               ),
             ),
             const SizedBox(height: 3),
@@ -361,7 +370,7 @@ class _AddChip extends StatelessWidget {
                 fontSize: 9,
                 height: 1.1,
                 fontWeight: FontWeight.w600,
-                color: DeckColors.onCard.withValues(alpha: 0.6),
+                color: onCard.withValues(alpha: 0.6),
               ),
             ),
           ],

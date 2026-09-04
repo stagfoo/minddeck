@@ -57,6 +57,7 @@ class _AppPickerScreenState extends State<AppPickerScreen> {
     final sorted = [...widget.installed]..sort(compareByLabel);
     final matches = searchApps(sorted, _query);
     final color = colorOf(widget.card.colorKey);
+    final onCard = onCardFor(color);
 
     return Scaffold(
       backgroundColor: DeckColors.ground,
@@ -93,7 +94,7 @@ class _AppPickerScreenState extends State<AppPickerScreen> {
                     child: Icon(
                       iconOf(widget.card.iconKey),
                       size: 15,
-                      color: DeckColors.onCard,
+                      color: onCard,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -112,7 +113,7 @@ class _AppPickerScreenState extends State<AppPickerScreen> {
                         : () => Navigator.pop(context, _chosen.toList()),
                     style: FilledButton.styleFrom(
                       backgroundColor: color,
-                      foregroundColor: DeckColors.onCard,
+                      foregroundColor: onCard,
                       disabledBackgroundColor: DeckColors.surface,
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       minimumSize: const Size(0, 40),
@@ -124,7 +125,7 @@ class _AppPickerScreenState extends State<AppPickerScreen> {
                         weight: 600,
                         color: _chosen.isEmpty
                             ? DeckColors.textDim
-                            : DeckColors.onCard,
+                            : onCard,
                       ),
                     ),
                   ),
@@ -199,7 +200,7 @@ class _AppPickerScreenState extends State<AppPickerScreen> {
           border: Border.all(color: chosen ? color : DeckColors.surfaceEdge),
         ),
         child: chosen
-            ? const Icon(Icons.check, size: 17, color: DeckColors.onCard)
+            ? Icon(Icons.check, size: 17, color: onCardFor(color))
             : null,
       ),
       title: Text(

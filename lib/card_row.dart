@@ -37,6 +37,7 @@ class CardAppRow extends StatelessWidget {
       itemBuilder: (context, index) {
         final app = apps[index];
         return _CardApp(
+          onCard: onCardFor(cardColor),
           app: app,
           onTap: () => onTap(app),
           onLongPress: onLongPress == null ? null : () => onLongPress!(app),
@@ -47,9 +48,15 @@ class CardAppRow extends StatelessWidget {
 }
 
 class _CardApp extends StatelessWidget {
-  const _CardApp({required this.app, required this.onTap, this.onLongPress});
+  const _CardApp({
+    required this.app,
+    required this.onCard,
+    required this.onTap,
+    this.onLongPress,
+  });
 
   final LaunchableApp app;
+  final Color onCard;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
@@ -69,7 +76,7 @@ class _CardApp extends StatelessWidget {
               decoration: BoxDecoration(
                 // A soft dark well behind the icon, so app artwork of any
                 // colour still separates from a bright card.
-                color: DeckColors.onCard.withValues(alpha: 0.16),
+                color: onCard.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(12),
               ),
               clipBehavior: Clip.antiAlias,
@@ -77,7 +84,7 @@ class _CardApp extends StatelessWidget {
               child: AppIconImage(
                 packageName: app.packageName,
                 size: 36,
-                color: DeckColors.onCard.withValues(alpha: 0.5),
+                color: onCard.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(height: 4),
@@ -90,7 +97,7 @@ class _CardApp extends StatelessWidget {
                 size: 9.5,
                 weight: 600,
                 height: 1.1,
-                color: DeckColors.onCard.withValues(alpha: 0.75),
+                color: onCard.withValues(alpha: 0.75),
               ),
             ),
           ],
