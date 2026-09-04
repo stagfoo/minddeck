@@ -188,7 +188,9 @@ void main() {
       await pump(tester, CardDeck.seed());
       await tester.tap(find.text('add').first);
       await tester.pumpAndSettle();
-      expect(find.text('Pick some apps'), findsOneWidget);
+      // The confirm sits beside the search field now, disabled until
+      // something is chosen.
+      expect(find.text('Add'), findsOneWidget);
       expect(
         tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
         isNull,
