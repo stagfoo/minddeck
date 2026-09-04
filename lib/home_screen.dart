@@ -240,7 +240,7 @@ class _HomeScreenState extends State<HomeScreen>
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Not the home app yet — tap to set MindDeck as default',
+                  'Not the home app yet — tap to set Rolidecks as default',
                   style: TextStyle(fontSize: 11, color: DeckColors.text),
                 ),
               ),

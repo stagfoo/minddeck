@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/theme.dart';
+import 'package:rolidecks/theme.dart';
 
 /// Measures a line of text laid out with [style].
 Size measure(TextStyle style) {

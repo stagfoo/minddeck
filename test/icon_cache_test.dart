@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/launcher_bridge.dart';
+import 'package:rolidecks/launcher_bridge.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('minddeck/launcher');
+  const channel = MethodChannel('rolidecks/launcher');
   late List<String> requested;
   late List<Completer<Uint8List?>> pending;
 

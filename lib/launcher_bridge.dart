@@ -1,4 +1,4 @@
-/// Thin wrapper over the `minddeck/launcher` channel. Marshalling only —
+/// Thin wrapper over the `rolidecks/launcher` channel. Marshalling only —
 /// every decision about what to show lives in the pure modules beside it.
 library;
 
@@ -12,8 +12,8 @@ class LauncherBridge {
 
   static final LauncherBridge instance = LauncherBridge._();
 
-  static const MethodChannel _channel = MethodChannel('minddeck/launcher');
-  static const EventChannel _packageEvents = EventChannel('minddeck/packages');
+  static const MethodChannel _channel = MethodChannel('rolidecks/launcher');
+  static const EventChannel _packageEvents = EventChannel('rolidecks/packages');
 
   /// Completed icons, for a synchronous hit that paints in the same frame.
   final Map<String, Uint8List?> _iconCache = {};

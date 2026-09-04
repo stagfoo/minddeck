@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/card_deck.dart';
-import 'package:minddeck/card_editor_sheet.dart';
+import 'package:rolidecks/card_deck.dart';
+import 'package:rolidecks/card_editor_sheet.dart';
 
 const card = DeckCard(id: 'c', name: 'media', colorKey: 'cyan', iconKey: 'music');
 

@@ -33,6 +33,6 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
-          name: minddeck-release-apk
+          name: rolidecks-release-apk
           path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           retention-days: 14

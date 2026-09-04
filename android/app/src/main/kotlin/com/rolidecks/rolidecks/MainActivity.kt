@@ -1,4 +1,4 @@
-package com.minddeck.minddeck
+package com.rolidecks.rolidecks
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -32,8 +32,8 @@ import java.util.concurrent.Executors
  * is plain Dart, so it can be tested without a device.
  */
 class MainActivity : FlutterActivity() {
-    private val methodChannelName = "minddeck/launcher"
-    private val eventChannelName = "minddeck/packages"
+    private val methodChannelName = "rolidecks/launcher"
+    private val eventChannelName = "rolidecks/packages"
 
     // The package list is one big job; icons are a hundred small ones. On a
     // single thread every icon queues behind every other icon and behind the

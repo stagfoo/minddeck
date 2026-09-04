@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'card_deck.dart';
 
 class DeckStore {
-  static const _key = 'minddeck.cards.v1';
+  static const _key = 'rolidecks.cards.v1';
 
   Future<CardDeck?> load() async {
     final prefs = await SharedPreferences.getInstance();

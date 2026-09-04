@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/deck_actions.dart';
+import 'package:rolidecks/deck_actions.dart';
 
 Future<void> pump(
   WidgetTester tester, {

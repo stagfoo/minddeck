@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/card_style.dart';
-import 'package:minddeck/side_rail.dart';
-import 'package:minddeck/stack_layout.dart';
-import 'package:minddeck/theme.dart';
+import 'package:rolidecks/card_style.dart';
+import 'package:rolidecks/side_rail.dart';
+import 'package:rolidecks/stack_layout.dart';
+import 'package:rolidecks/theme.dart';
 
 Future<void> pump(
   WidgetTester tester, {

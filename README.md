@@ -1,7 +1,8 @@
-# MindDeck
+# Rolidecks
 
 A portrait card-stack home launcher for the **iKKO Mind One** — a card-sized
-Android 15 phone with a 1080 × 1240 panel.
+Android 15 phone with a 1080 × 1240 panel. A rolodex you flip through, not a
+grid you hunt in.
 
 Each card is a coloured folder holding a sideways-scrolling row of apps. The
 cards **overlap like a rolodex**: the first card is the front of the deck and
@@ -101,10 +102,10 @@ the selection is right.
 ## Using it as the home app
 
 1. Install the APK.
-2. Open MindDeck once from your current launcher — it keeps a `LAUNCHER` intent
+2. Open Rolidecks once from your current launcher — it keeps a `LAUNCHER` intent
    filter for exactly this.
 3. Tap the banner it shows to land in **Settings → Apps → Default apps → Home
-   app**, and pick MindDeck.
+   app**, and pick Rolidecks.
 
 There is no API to set the default home app directly, by design, so that picker
 is the whole of "make me the launcher".
@@ -168,8 +169,8 @@ would measure identically.
 [Obtainium](https://github.com/ImranR98/Obtainium) tracks the GitHub releases
 and installs updates, which beats downloading an APK by hand every time.
 
-**Add it:** [obtainium://app/…](obtainium://app/%7B%22id%22%3A%22com.minddeck.minddeck%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fstagfoo%2Fminddeck%22%2C%22author%22%3A%22stagfoo%22%2C%22name%22%3A%22MindDeck%22%7D) — or paste
-`https://github.com/stagfoo/minddeck` into Obtainium's Add App screen. The
+**Add it:** [obtainium://app/…](obtainium://app/%7B%22id%22%3A%22com.rolidecks.rolidecks%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fstagfoo%2Frolidecks%22%2C%22author%22%3A%22stagfoo%22%2C%22name%22%3A%22Rolidecks%22%7D) — or paste
+`https://github.com/stagfoo/rolidecks` into Obtainium's Add App screen. The
 config the link carries is just id, url, author and name; no extra settings are
 needed, because releases are shaped to Obtainium's defaults:
 
@@ -192,13 +193,19 @@ releases rather than with access to them.
 `android/app/debug.keystore` is public along with everything else. It is a
 debug-only key with the standard `android` password and is not used for release
 signing, but it does mean the signature on these APKs is not a secret: anyone
-could sign an APK that Android would accept as an update to MindDeck. They would
+could sign an APK that Android would accept as an update to Rolidecks. They would
 still have to get it onto the phone, and nothing here is distributed through a
 store, so the exposure is small — but it is the reason to think twice before
 reusing this pattern for anything that matters.
 
 Releases before `1.0.1` used the old `v1.0.0-<sha>` tag format and will not
 compare cleanly; the first Obtainium-tracked version is `1.0.1`.
+
+This app was called MindDeck until `1.0.5`. The rename changed the Android
+applicationId, so Android treats Rolidecks as a new app rather than an update:
+remove the old Obtainium entry and add this one, set Rolidecks as the home app,
+and uninstall MindDeck once you are happy. The deck does not carry over — an
+applicationId is an app's identity, and a different one gets its own storage.
 
 ## Building
 

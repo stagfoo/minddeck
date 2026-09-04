@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/app_picker_screen.dart';
-import 'package:minddeck/card_deck.dart';
-import 'package:minddeck/models.dart';
+import 'package:rolidecks/app_picker_screen.dart';
+import 'package:rolidecks/card_deck.dart';
+import 'package:rolidecks/models.dart';
 
 final installed = [
   for (var i = 0; i < 40; i++)

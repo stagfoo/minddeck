@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/stack_layout.dart';
+import 'package:rolidecks/stack_layout.dart';
 
 void main() {
   // The Mind One in portrait: 1080 × 1240 physical, about 393 × 451 dp at a

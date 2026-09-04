@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/app_cache.dart';
-import 'package:minddeck/models.dart';
+import 'package:rolidecks/app_cache.dart';
+import 'package:rolidecks/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 LaunchableApp app(String package, {String? label, bool isSystem = false}) =>
@@ -61,12 +61,12 @@ void main() {
     });
 
     test('not JSON at all', () async {
-      SharedPreferences.setMockInitialValues({'minddeck.apps.v1': 'nonsense'});
+      SharedPreferences.setMockInitialValues({'rolidecks.apps.v1': 'nonsense'});
       expect(await AppCache().load(), isNull);
     });
 
     test('JSON of the wrong shape', () async {
-      SharedPreferences.setMockInitialValues({'minddeck.apps.v1': '[1,2,3]'});
+      SharedPreferences.setMockInitialValues({'rolidecks.apps.v1': '[1,2,3]'});
       expect(await AppCache().load(), isNull);
     });
 
@@ -74,7 +74,7 @@ void main() {
       // Written by a future build that may mean something different by these
       // fields; refetching from the platform is always safe.
       SharedPreferences.setMockInitialValues({
-        'minddeck.apps.v1': jsonEncode({
+        'rolidecks.apps.v1': jsonEncode({
           'schemaVersion': AppCache.schemaVersion + 1,
           'apps': [app('com.a').toJson()],
         }),
@@ -84,7 +84,7 @@ void main() {
 
     test('an entry missing its package name', () async {
       SharedPreferences.setMockInitialValues({
-        'minddeck.apps.v1': jsonEncode({
+        'rolidecks.apps.v1': jsonEncode({
           'schemaVersion': AppCache.schemaVersion,
           'apps': [
             {'label': 'No package here'},

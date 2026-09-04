@@ -7,9 +7,9 @@
 # here anyway because everything the launcher can do goes through it: if it were
 # ever renamed or reached only reflectively, the failure would be a launcher
 # that installs and then does nothing.
--keep class com.minddeck.minddeck.MainActivity { *; }
+-keep class com.rolidecks.rolidecks.MainActivity { *; }
 
 # Method-channel handlers are invoked from the platform side by name.
--keepclassmembers class com.minddeck.minddeck.** {
+-keepclassmembers class com.rolidecks.rolidecks.** {
     public *** *(...);
 }

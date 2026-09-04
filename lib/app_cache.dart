@@ -53,7 +53,7 @@ class AppSnapshot {
 
 class AppCache {
   static const schemaVersion = 1;
-  static const _key = 'minddeck.apps.v1';
+  static const _key = 'rolidecks.apps.v1';
 
   Future<AppSnapshot?> load() async {
     final prefs = await SharedPreferences.getInstance();

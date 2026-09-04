@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/card_deck.dart';
-import 'package:minddeck/card_style.dart';
-import 'package:minddeck/models.dart';
+import 'package:rolidecks/card_deck.dart';
+import 'package:rolidecks/card_style.dart';
+import 'package:rolidecks/models.dart';
 
 LaunchableApp app(String package, {String? label}) => LaunchableApp(
       packageName: package,

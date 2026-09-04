@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minddeck/models.dart';
+import 'package:rolidecks/models.dart';
 
 void main() {
   group('ScreenMetrics', () {

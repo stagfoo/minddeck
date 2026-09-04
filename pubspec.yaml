@@ -1,5 +1,5 @@
-name: minddeck
-description: "MindDeck — a landscape, Switch-style home launcher for the iKKO Mind One's near-square screen."
+name: rolidecks
+description: "Rolidecks — a portrait card-stack home launcher for the iKKO Mind One: a rolodex of coloured cards, each a folder of apps."
 publish_to: 'none'
 
 version: 1.0.4+5
