@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'card_deck.dart';
 import 'card_style.dart';
+import 'icon_picker_screen.dart';
 import 'theme.dart';
 
 /// What the editor hands back: the edited card, and where it should sit.
@@ -270,12 +271,37 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
     );
   }
 
+  Future<void> _pickIcon() async {
+    final picked = await showIconPicker(
+      context,
+      current: _draft.iconKey,
+      accent: colorOf(_draft.colorKey),
+    );
+    if (picked != null) setState(() => _draft = _draft.copyWith(iconKey: picked));
+  }
+
   Widget _icons() {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       children: [
-        for (final key in cardIconKeys)
+        // The common ones are a tap; everything else is a search away. All
+        // 2,200 laid out here would be a wall, not a choice.
+        GestureDetector(
+          onTap: _pickIcon,
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: DeckColors.surface,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: DeckColors.surfaceEdge),
+            ),
+            child: const Icon(Icons.search,
+                size: 20, color: DeckColors.textDim),
+          ),
+        ),
+        for (final key in popularIconKeys)
           GestureDetector(
             onTap: () => setState(() => _draft = _draft.copyWith(iconKey: key)),
             child: AnimatedContainer(

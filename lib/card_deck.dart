@@ -136,7 +136,7 @@ class CardDeck {
         id: 'card-${DateTime.now().microsecondsSinceEpoch}-$index',
         name: name,
         colorKey: paletteAt(index).key,
-        iconKey: cardIconKeys[(index + 1) % cardIconKeys.length],
+        iconKey: popularIconKeys[(index + 1) % popularIconKeys.length],
       ),
     ]);
   }

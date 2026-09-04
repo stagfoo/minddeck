@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 
 import 'card_style.dart';
+import 'icon_catalogue.dart';
 
 class DeckColors {
   static const ground = Color(0xFF08080A);
@@ -34,48 +35,13 @@ class DeckMetrics {
 
 Color colorOf(String key) => Color(colorForKey(key).value);
 
-/// Glyph for a stored icon key. The model holds keys, not Flutter types, so
-/// this is the one place the two vocabularies meet.
-IconData iconOf(String key) {
-  switch (normaliseIconKey(key)) {
-    case 'apps':
-      return Icons.grid_view_rounded;
-    case 'camera':
-      return Icons.photo_camera_rounded;
-    case 'music':
-      return Icons.music_note_rounded;
-    case 'photo':
-      return Icons.image_rounded;
-    case 'chat':
-      return Icons.chat_bubble_rounded;
-    case 'globe':
-      return Icons.public_rounded;
-    case 'game':
-      return Icons.sports_esports_rounded;
-    case 'book':
-      return Icons.menu_book_rounded;
-    case 'map':
-      return Icons.map_rounded;
-    case 'clock':
-      return Icons.schedule_rounded;
-    case 'heart':
-      return Icons.favorite_rounded;
-    case 'star':
-      return Icons.star_rounded;
-    case 'bolt':
-      return Icons.bolt_rounded;
-    case 'cog':
-      return Icons.settings_rounded;
-    case 'wallet':
-      return Icons.account_balance_wallet_rounded;
-    case 'note':
-      return Icons.sticky_note_2_rounded;
-    case 'tools':
-      return Icons.build_rounded;
-    default:
-      return Icons.folder_rounded;
-  }
-}
+/// Glyph for a stored icon key.
+///
+/// The model holds names, not Flutter types, so this is the one place the two
+/// vocabularies meet — now a lookup into the generated catalogue rather than a
+/// switch someone had to keep extending by hand.
+IconData iconOf(String key) =>
+    materialIcons[normaliseIconKey(key)] ?? Icons.folder_rounded;
 
 /// Text in Lexend at a given weight.
 ///

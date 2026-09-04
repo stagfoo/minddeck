@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rolidecks/card_deck.dart';
 import 'package:rolidecks/card_style.dart';
+import 'package:rolidecks/icon_catalogue.dart';
 import 'package:rolidecks/models.dart';
 
 LaunchableApp app(String package, {String? label}) => LaunchableApp(
@@ -223,13 +224,14 @@ void main() {
       var deck = CardDeck.seed();
       final id = deck.folders.first.id;
       deck = deck
-          .updateCard(id, (card) => card.copyWith(colorKey: 'violet', iconKey: 'book'))
+          .updateCard(
+              id, (card) => card.copyWith(colorKey: 'violet', iconKey: 'menu_book'))
           .assign(idOf('com.a'), id);
 
       final restored = CardDeck.fromJson(deck.toJson());
       final card = restored.cards[restored.indexOfId(id)];
       expect(card.colorKey, 'violet');
-      expect(card.iconKey, 'book');
+      expect(card.iconKey, 'menu_book');
       expect(card.appIds, [idOf('com.a')]);
       expect(restored.cards.last.isAllApps, isTrue);
     });
@@ -245,6 +247,15 @@ void main() {
       expect(CardDeck.fromJson([1, null]).length, 1);
     });
 
+    test('an icon key from before the catalogue is translated, not lost', () {
+      // Early builds invented their own short names; a card saved then must
+      // keep its icon rather than falling back to a folder.
+      final restored = CardDeck.fromJson([
+        {'id': 'x', 'name': 'x', 'colorKey': 'cyan', 'iconKey': 'game'},
+      ]);
+      expect(restored.folders.single.iconKey, 'sports_esports');
+    });
+
     test('a colour or icon this build does not know falls back, not crashes', () {
       // A deck written by a future version with a bigger palette must still open.
       final restored = CardDeck.fromJson([
@@ -252,7 +263,7 @@ void main() {
       ]);
       final card = restored.folders.single;
       expect(isKnownColorKey(card.colorKey), isTrue);
-      expect(cardIconKeys, contains(card.iconKey));
+      expect(materialIcons.keys, contains(card.iconKey));
     });
   });
 

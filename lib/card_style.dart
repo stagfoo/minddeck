@@ -9,6 +9,8 @@
 /// without dragging widgets into it.
 library;
 
+import 'icon_catalogue.dart';
+
 class CardColor {
   const CardColor(this.key, this.name, this.value);
 
@@ -37,30 +39,71 @@ const List<CardColor> cardPalette = [
   CardColor('butter', 'Butter', 0xFFFFD93D),
 ];
 
-/// Icon identities, stored as keys so the model never holds a Flutter type.
-/// The widget layer maps these to real glyphs.
-const List<String> cardIconKeys = [
-  'apps',
-  'camera',
-  'music',
-  'photo',
-  'chat',
-  'globe',
-  'game',
-  'book',
-  'map',
-  'clock',
-  'heart',
+/// The icons offered up front in the card editor, before searching.
+///
+/// Every Material icon is available — see [materialIcons], all 2,200 of them —
+/// but a wall of two thousand is not a choice, it is a search problem. These
+/// are the ones a folder of apps is usually about, so the common case is a tap
+/// rather than a query.
+const List<String> popularIconKeys = [
+  'grid_view',
   'star',
+  'favorite',
+  'music_note',
+  'photo_camera',
+  'image',
+  'movie',
+  'sports_esports',
+  'chat_bubble',
+  'call',
+  'mail',
+  'public',
+  'menu_book',
+  'map',
+  'schedule',
+  'alarm',
+  'shopping_bag',
+  'account_balance_wallet',
+  'work',
+  'school',
+  'fitness_center',
+  'restaurant',
+  'directions_car',
+  'flight',
+  'build',
+  'settings',
+  'code',
+  'terminal',
+  'cloud',
+  'lock',
+  'sticky_note_2',
+  'checklist',
   'bolt',
-  'cog',
+  'lightbulb',
+  'palette',
   'folder',
-  'wallet',
-  'note',
-  'tools',
 ];
 
 const String fallbackIconKey = 'folder';
+
+/// Keys written by the first builds, which used names of their own invention
+/// rather than Material's. Kept so a card saved then keeps its icon.
+const Map<String, String> legacyIconKeys = {
+  'apps': 'grid_view',
+  'camera': 'photo_camera',
+  'music': 'music_note',
+  'photo': 'image',
+  'chat': 'chat_bubble',
+  'globe': 'public',
+  'game': 'sports_esports',
+  'book': 'menu_book',
+  'clock': 'schedule',
+  'heart': 'favorite',
+  'cog': 'settings',
+  'wallet': 'account_balance_wallet',
+  'note': 'sticky_note_2',
+  'tools': 'build',
+};
 
 /// The colour for [key], falling back to the first entry rather than throwing:
 /// a stored deck from an older palette must still open.
@@ -73,10 +116,24 @@ CardColor colorForKey(String key) {
 
 bool isKnownColorKey(String key) => cardPalette.any((color) => color.key == key);
 
-/// Normalises an icon key, so a deck written by a future version with icons
-/// this build doesn't have still renders something sensible.
-String normaliseIconKey(String? key) =>
-    key != null && cardIconKeys.contains(key) ? key : fallbackIconKey;
+/// Normalises an icon key: translates a legacy name, accepts anything in the
+/// catalogue, and falls back for anything else — so a deck written by a future
+/// version with icons this build does not have still renders something.
+String normaliseIconKey(String? key) {
+  if (key == null) return fallbackIconKey;
+  final translated = legacyIconKeys[key] ?? key;
+  return materialIcons.containsKey(translated) ? translated : fallbackIconKey;
+}
+
+/// Icons whose name contains [query], for the picker's search.
+List<String> searchIcons(String query) {
+  final needle = query.trim().toLowerCase().replaceAll(' ', '_');
+  if (needle.isEmpty) return popularIconKeys;
+  return [
+    for (final key in materialIcons.keys)
+      if (key.contains(needle)) key,
+  ];
+}
 
 /// The colour a card gets when it is created and nobody has picked one, walking
 /// the palette so a fresh deck is not eight magenta cards.
