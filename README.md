@@ -41,7 +41,9 @@ already filed there**, and a **+** to add more.
   purpose — that is what lets the list scroll. A drag anywhere on the row would
   fight the list's own scrolling, which is the conflict that makes these UIs
   feel broken.
-- **Tap a card's name** to edit its colour, icon and name, or delete it.
+- **Tap the card** — anywhere on it — to edit its colour, icon and name, or
+  delete it. A small pencil marks it. The app chips, the + and the handle are
+  children, so they are hit first and keep doing their own jobs.
 - **Tap +** for a searchable, multi-select picker: file a card's worth of apps
   in one go rather than one sheet at a time. An app already on the card is
   greyed out, and one filed elsewhere says which card it will move from.

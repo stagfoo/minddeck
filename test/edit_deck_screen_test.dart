@@ -94,6 +94,50 @@ void main() {
     });
   });
 
+  group('tapping a card opens its editor', () {
+    testWidgets('from the name', (tester) async {
+      await pump(tester, CardDeck.seed());
+      await tester.tap(find.text('daily'));
+      await tester.pumpAndSettle();
+      expect(find.text('Colour'), findsOneWidget);
+      expect(find.text('Icon'), findsOneWidget);
+    });
+
+    testWidgets('from empty space on the card, not just the name',
+        (tester) async {
+      // The name strip alone is a thin target; the card is the thing being
+      // edited, so the whole of it should open the editor.
+      await pump(tester, CardDeck.seed());
+      final card = find.ancestor(
+        of: find.text('daily'),
+        matching: find.byType(GestureDetector),
+      ).last;
+      final box = tester.getRect(card);
+      // Low on the card, below the name row and clear of the app chips.
+      await tester.tapAt(Offset(box.right - 12, box.bottom - 6));
+      await tester.pumpAndSettle();
+      expect(find.text('Colour'), findsOneWidget);
+    });
+
+    testWidgets('but tapping add still opens the picker', (tester) async {
+      // The chips are children, so they are hit first and keep their own jobs.
+      await pump(tester, CardDeck.seed());
+      await tester.tap(find.text('add').first);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Add to'), findsOneWidget);
+      expect(find.text('Colour'), findsNothing);
+    });
+
+    testWidgets('and tapping an app still unfiles it', (tester) async {
+      final deck = CardDeck.seed().assign(idOf('com.a'), 'card-seed-0');
+      await pump(tester, deck);
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+      expect(find.text('Alpha'), findsNothing);
+      expect(find.text('Colour'), findsNothing);
+    });
+  });
+
   group('apps on a card', () {
     testWidgets('are shown, with an add button beside them', (tester) async {
       final deck = CardDeck.seed().assign(idOf('com.a'), 'card-seed-0');

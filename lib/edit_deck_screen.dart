@@ -87,17 +87,21 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back_rounded,
-                size: 22, color: DeckColors.text),
+            child: const Icon(
+              Icons.arrow_back_rounded,
+              size: 22,
+              color: DeckColors.text,
+            ),
           ),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
               'Edit deck',
               style: TextStyle(
-                  color: DeckColors.text,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700),
+                color: DeckColors.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           IconButton(
@@ -117,74 +121,82 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
     return Padding(
       key: ValueKey(card.id),
       padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(DeckMetrics.cardRadius),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(6, 6, 12, 2),
-              child: Row(
-                children: [
-                  ReorderableDragStartListener(
-                    index: index,
-                    child: const Padding(
-                      // Generous padding: the handle is the only way to move a
-                      // card, so it has to be an easy target.
-                      padding: EdgeInsets.all(8),
-                      child: Icon(Icons.drag_indicator_rounded,
-                          size: 20, color: DeckColors.onCard),
-                    ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => _editCard(card, index),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              card.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: DeckColors.onCard,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          Icon(iconOf(card.iconKey),
-                              size: 17, color: DeckColors.onCard),
-                        ],
+      // The whole card opens the editor, not just its name: a name strip is a
+      // thin target, and the card is the thing being edited. The app chips, the
+      // add button and the drag handle are children, so they are hit first and
+      // still do their own jobs.
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _editCard(card, index),
+        child: Container(
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(DeckMetrics.cardRadius),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 6, 12, 2),
+                child: Row(
+                  children: [
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: const Padding(
+                        // Generous padding: the handle is the only way to move a
+                        // card, so it has to be an easy target.
+                        padding: EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.drag_indicator_rounded,
+                          size: 20,
+                          color: DeckColors.onCard,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(
-              height: 66,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                children: [
-                  for (final app in apps) ...[
-                    _AppChip(
-                      app: app,
-                      onTap: () => _unfile(app),
+                    Expanded(
+                      child: Text(
+                        card.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: DeckColors.onCard,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
+                    Icon(
+                      iconOf(card.iconKey),
+                      size: 17,
+                      color: DeckColors.onCard,
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.edit_rounded,
+                      size: 14,
+                      color: DeckColors.onCard.withValues(alpha: 0.55),
+                    ),
                   ],
-                  _AddChip(onTap: () => _addApps(card)),
-                ],
+                ),
               ),
-            ),
-          ],
+              SizedBox(
+                height: 66,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  children: [
+                    for (final app in apps) ...[
+                      _AppChip(app: app, onTap: () => _unfile(app)),
+                      const SizedBox(width: 8),
+                    ],
+                    _AddChip(onTap: () => _addApps(card)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -250,9 +262,11 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
       folderCount: _deck.folders.length,
     );
     if (result == null) return;
-    _update(result.deleted
-        ? _deck.removeCard(card.id)
-        : _deck.updateCard(card.id, (_) => result.card));
+    _update(
+      result.deleted
+          ? _deck.removeCard(card.id)
+          : _deck.updateCard(card.id, (_) => result.card),
+    );
   }
 
   Future<void> _addCard() async {
@@ -332,8 +346,11 @@ class _AddChip extends StatelessWidget {
                   width: 1.5,
                 ),
               ),
-              child: Icon(Icons.add_rounded,
-                  size: 22, color: DeckColors.onCard.withValues(alpha: 0.75)),
+              child: Icon(
+                Icons.add_rounded,
+                size: 22,
+                color: DeckColors.onCard.withValues(alpha: 0.75),
+              ),
             ),
             const SizedBox(height: 3),
             Text(
@@ -364,8 +381,11 @@ class _Icon extends StatelessWidget {
       builder: (context, snapshot) {
         final bytes = snapshot.data;
         if (bytes == null) {
-          return Icon(Icons.android,
-              size: 18, color: DeckColors.onCard.withValues(alpha: 0.5));
+          return Icon(
+            Icons.android,
+            size: 18,
+            color: DeckColors.onCard.withValues(alpha: 0.5),
+          );
         }
         return Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true);
       },
