@@ -182,9 +182,19 @@ needed, because releases are shaped to Obtainium's defaults:
   treat the APK as an update.
 - **One APK asset per release**, so no `apkFilterRegEx` is needed.
 
-**This repo is private**, so Obtainium needs a GitHub personal access token with
-`repo` scope, under Settings → Source-specific → GitHub. Without one it cannot
-see the releases at all. Making the repo public would remove that step.
+The repo is public so that this needs no token. While it was private, GitHub's
+API answered anonymous requests with a 404 rather than a 403 — it hides private
+repos rather than admitting they exist — and Obtainium surfaced that as
+"Could not find a suitable release", which reads like a problem with the
+releases rather than with access to them.
+
+`android/app/debug.keystore` is public along with everything else. It is a
+debug-only key with the standard `android` password and is not used for release
+signing, but it does mean the signature on these APKs is not a secret: anyone
+could sign an APK that Android would accept as an update to MindDeck. They would
+still have to get it onto the phone, and nothing here is distributed through a
+store, so the exposure is small — but it is the reason to think twice before
+reusing this pattern for anything that matters.
 
 Releases before `1.0.1` used the old `v1.0.0-<sha>` tag format and will not
 compare cleanly; the first Obtainium-tracked version is `1.0.1`.
