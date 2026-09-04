@@ -46,8 +46,7 @@ class AppTile extends StatelessWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 padding: EdgeInsets.all(size * 0.13),
-                child: AppIconImage(
-                    packageName: app.packageName, size: size * 0.74),
+                child: AppIconImage(app: app, size: size * 0.74),
               ),
               if (filed)
                 Positioned(

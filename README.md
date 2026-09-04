@@ -59,6 +59,24 @@ already filed there**, and a **+** to add more.
 
 All apps sits at the bottom with no handle and no +: it is the back of the deck
 and holds everything by definition.
+
+### Shortcuts
+
+"Add to home screen" from another app — a folder from a file manager, a
+conversation from a chat app — pins a shortcut here, and it then behaves like
+any other entry: it appears under all apps, can be filed on a card, searched
+for and launched.
+
+Nothing pins itself. Android hands a pin request to whichever launcher declares
+`CONFIRM_PIN_SHORTCUT`, and drops it if none does, which is why the option looks
+broken from the other app's side until a launcher answers.
+`PinShortcutActivity` accepts rather than asking a second time — you already
+tapped "add to home screen" — and toasts where the shortcut went.
+
+Only the default launcher may read or start pinned shortcuts, so until Rolidecks
+is set as home the shortcut list is legitimately empty rather than an error.
+Shortcut ids are prefixed `shortcut:` so they can never collide with an app
+whose activity happens to share the name.
 - **+** in the top strip adds a card and opens the editor on it.
 - Inside **all apps**, hold an app to file it under a card. An app lives on at
   most one card — two homes would show it twice and make removing it ambiguous.

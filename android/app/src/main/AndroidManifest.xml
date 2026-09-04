@@ -44,6 +44,23 @@
             </intent-filter>
         </activity>
 
+        <!-- Accepts "add to home screen" from other apps. Android delivers a
+             pin request to whichever launcher declares this; with no handler
+             the request is dropped and the option looks broken from the other
+             app's side. Translucent and excluded from recents because it
+             accepts and finishes without a screen of its own. -->
+        <activity
+            android:name=".PinShortcutActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

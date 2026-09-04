@@ -82,7 +82,7 @@ class _CardApp extends StatelessWidget {
               clipBehavior: Clip.antiAlias,
               padding: const EdgeInsets.all(6),
               child: AppIconImage(
-                packageName: app.packageName,
+                app: app,
                 size: 36,
                 color: onCard.withValues(alpha: 0.5),
               ),

@@ -119,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen>
     // Concurrently, not one after another: these are three independent
     // round-trips and listApps is by far the slowest of them.
     final results = await Future.wait([
-      LauncherBridge.instance.listApps(),
+      LauncherBridge.instance.listEverything(),
       LauncherBridge.instance.screenMetrics(),
       LauncherBridge.instance.isDefaultLauncher(),
     ]);
@@ -146,8 +146,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _refreshApps() async {
-    final apps = await LauncherBridge.instance.listApps();
-    await _adopt(apps);
+    await _adopt(await LauncherBridge.instance.listEverything());
   }
 
   /// The manual refresh, for when something changed that neither a package
@@ -157,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() => _refreshing = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final apps = await LauncherBridge.instance.listApps();
+      final apps = await LauncherBridge.instance.listEverything();
       final changed = appListsDiffer(_installed, apps);
       await _adopt(apps);
       if (!mounted) return;
@@ -314,8 +313,7 @@ class _HomeScreenState extends State<HomeScreen>
                     ? _openCard(_deck[i])
                     : setState(() => _focused = i),
                 onLongPress: _openEditDeck,
-                onAppTap: (app) =>
-                    LauncherBridge.instance.launch(app.packageName),
+                onAppTap: LauncherBridge.instance.open,
                 onAppLongPress: (app) => _showAppMenu(_deck[i], app),
               ),
             ),
@@ -381,9 +379,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
     );
-    if (chosen != null) {
-      await LauncherBridge.instance.launch(chosen.packageName);
-    }
+    if (chosen != null) await LauncherBridge.instance.open(chosen);
   }
 
   /// Filing an app straight from the card it is sitting on, so the common case

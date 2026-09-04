@@ -306,7 +306,7 @@ class _AppChip extends StatelessWidget {
               clipBehavior: Clip.antiAlias,
               padding: const EdgeInsets.all(5),
               child: AppIconImage(
-                packageName: app.packageName,
+                app: app,
                 size: 32,
                 color: onCard.withValues(alpha: 0.5),
               ),

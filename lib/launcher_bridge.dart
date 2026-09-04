@@ -41,14 +41,67 @@ class LauncherBridge {
         .toList();
   }
 
+  /// Shortcuts other apps have pinned here. Empty until Rolidecks is the
+  /// default launcher — only the host launcher may read them, which is a
+  /// legitimate state rather than a failure.
+  Future<List<LaunchableApp>> listShortcuts() async {
+    final raw =
+        await _channel.invokeListMethod<Object?>('listShortcuts') ?? const [];
+    return raw
+        .whereType<Map<Object?, Object?>>()
+        .map(LaunchableApp.shortcutFromPlatform)
+        .toList();
+  }
+
+  /// Everything launchable, apps and pinned shortcuts together, so cards and
+  /// search never have to ask which is which.
+  Future<List<LaunchableApp>> listEverything() async {
+    final results = await Future.wait([listApps(), listShortcuts()]);
+    return [...results[0], ...results[1]];
+  }
+
   /// The icon if it has already been fetched, without touching the channel.
   ///
   /// Lets a widget paint a known icon in the frame it builds, instead of
   /// showing a placeholder for one frame while a Future that is already
   /// complete gets resolved.
-  Uint8List? cachedIcon(String packageName) => _iconCache[packageName];
+  Uint8List? cachedIcon(String key) => _iconCache[key];
 
-  bool hasIcon(String packageName) => _iconCache.containsKey(packageName);
+  bool hasIcon(String key) => _iconCache.containsKey(key);
+
+  /// The icon for [app], whichever kind it is. Cached and de-duplicated on the
+  /// item's id, so a shortcut and its host app do not share one entry.
+  Future<Uint8List?> iconFor(LaunchableApp app, {int size = 144}) {
+    if (!app.isShortcut) {
+      // Keyed by id as well as package, so a synchronous cache hit works the
+      // same for both kinds and the widget only has to ask once.
+      final byPackage = appIcon(app.packageName, size: size);
+      _iconCache[app.id] = _iconCache[app.packageName];
+      return byPackage;
+    }
+
+    final key = app.id;
+    if (_iconCache.containsKey(key)) {
+      return SynchronousFuture(_iconCache[key]);
+    }
+    final inFlight = _iconRequests[key];
+    if (inFlight != null) return inFlight;
+
+    final request = _channel.invokeMethod<Uint8List>(
+      'shortcutIcon',
+      {'packageName': app.packageName, 'shortcutId': app.shortcutId},
+    ).then((bytes) {
+      _iconCache[key] = bytes;
+      _iconRequests.remove(key);
+      return bytes;
+    }, onError: (Object error) {
+      _iconRequests.remove(key);
+      return null;
+    });
+
+    _iconRequests[key] = request;
+    return request;
+  }
 
   Future<Uint8List?> appIcon(String packageName, {int size = 144}) {
     if (_iconCache.containsKey(packageName)) {
@@ -81,6 +134,17 @@ class LauncherBridge {
   Future<bool> launch(String packageName) async =>
       await _channel.invokeMethod<bool>('launch', {'packageName': packageName}) ??
       false;
+
+  /// Launches [app], dispatching on its kind — a shortcut goes through
+  /// LauncherApps rather than a launch intent.
+  Future<bool> open(LaunchableApp app) async {
+    if (!app.isShortcut) return launch(app.packageName);
+    return await _channel.invokeMethod<bool>('launchShortcut', {
+          'packageName': app.packageName,
+          'shortcutId': app.shortcutId,
+        }) ??
+        false;
+  }
 
   Future<void> openAppInfo(String packageName) =>
       _channel.invokeMethod<void>('openAppInfo', {'packageName': packageName});

@@ -4,7 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
+import android.content.pm.ShortcutInfo
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -14,6 +16,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.UserHandle
+import android.os.UserManager
 import android.provider.Settings
 import android.util.DisplayMetrics
 import io.flutter.embedding.android.FlutterActivity
@@ -89,6 +93,18 @@ class MainActivity : FlutterActivity() {
     private fun handle(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "listApps" -> onWorker(result) { listApps() }
+            "listShortcuts" -> onWorker(result) { listShortcuts() }
+            "launchShortcut" -> result.success(
+                launchShortcut(
+                    call.argument<String>("packageName") ?: "",
+                    call.argument<String>("shortcutId") ?: ""
+                )
+            )
+            "shortcutIcon" -> {
+                val pkg = call.argument<String>("packageName") ?: ""
+                val id = call.argument<String>("shortcutId") ?: ""
+                onWorker(result) { shortcutIcon(pkg, id) }
+            }
             "appIcon" -> {
                 val pkg = call.argument<String>("packageName") ?: ""
                 val size = call.argument<Int>("size") ?: 128
@@ -151,6 +167,106 @@ class MainActivity : FlutterActivity() {
                 "isSystem" to isSystem(activity.packageName)
             )
         }
+    }
+
+    private val launcherApps: LauncherApps
+        get() = getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+
+    /**
+     * Shortcuts other apps have pinned here — a folder from a file manager, a
+     * conversation from a chat app.
+     *
+     * Only the default launcher may read these, which is what
+     * hasShortcutHostPermission answers. Before Rolidecks is set as home the
+     * list is legitimately empty rather than an error worth reporting.
+     */
+    private fun listShortcuts(): List<Map<String, Any?>> {
+        if (!launcherApps.hasShortcutHostPermission()) return emptyList()
+
+        val query = LauncherApps.ShortcutQuery()
+            .setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED)
+
+        val userManager = getSystemService(Context.USER_SERVICE) as UserManager
+        val out = mutableListOf<Map<String, Any?>>()
+        for (profile in userManager.userProfiles) {
+            val found: List<ShortcutInfo> = try {
+                launcherApps.getShortcuts(query, profile) ?: emptyList()
+            } catch (e: SecurityException) {
+                // Lost host permission between the check and the call, e.g. the
+                // user just switched launchers.
+                emptyList()
+            }
+            for (shortcut in found) {
+                out.add(
+                    mapOf(
+                        "packageName" to shortcut.getPackage(),
+                        "shortcutId" to shortcut.id,
+                        "label" to (shortcut.longLabel ?: shortcut.shortLabel ?: shortcut.id)
+                            .toString(),
+                        "enabled" to shortcut.isEnabled
+                    )
+                )
+            }
+        }
+        return out
+    }
+
+    private fun launchShortcut(packageName: String, shortcutId: String): Boolean {
+        return try {
+            launcherApps.startShortcut(
+                packageName,
+                shortcutId,
+                null,
+                null,
+                userForShortcut(packageName, shortcutId)
+            )
+            true
+        } catch (e: Exception) {
+            // The shortcut may have been disabled or its app uninstalled since
+            // the list was taken.
+            false
+        }
+    }
+
+    private fun userForShortcut(packageName: String, shortcutId: String): UserHandle {
+        val userManager = getSystemService(Context.USER_SERVICE) as UserManager
+        val query = LauncherApps.ShortcutQuery()
+            .setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED)
+            .setPackage(packageName)
+            .setShortcutIds(listOf(shortcutId))
+        for (profile in userManager.userProfiles) {
+            val found = try {
+                launcherApps.getShortcuts(query, profile)
+            } catch (e: SecurityException) {
+                null
+            }
+            if (!found.isNullOrEmpty()) return profile
+        }
+        return android.os.Process.myUserHandle()
+    }
+
+    private fun shortcutIcon(packageName: String, shortcutId: String): ByteArray? {
+        if (!launcherApps.hasShortcutHostPermission()) return null
+        val query = LauncherApps.ShortcutQuery()
+            .setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED)
+            .setPackage(packageName)
+            .setShortcutIds(listOf(shortcutId))
+
+        val userManager = getSystemService(Context.USER_SERVICE) as UserManager
+        for (profile in userManager.userProfiles) {
+            val found = try {
+                launcherApps.getShortcuts(query, profile)
+            } catch (e: SecurityException) {
+                null
+            }
+            val shortcut = found?.firstOrNull() ?: continue
+            val drawable = launcherApps.getShortcutIconDrawable(
+                shortcut,
+                resources.displayMetrics.densityDpi
+            ) ?: continue
+            return rasterise(drawable, 144)
+        }
+        return null
     }
 
     private fun isSystem(packageName: String): Boolean = try {
@@ -236,6 +352,10 @@ class MainActivity : FlutterActivity() {
         } catch (e: PackageManager.NameNotFoundException) {
             return null
         }
+        return rasterise(drawable, size)
+    }
+
+    private fun rasterise(drawable: Drawable, size: Int): ByteArray {
         val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null) {
             Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
         } else {

@@ -1,5 +1,11 @@
-/// What the launcher knows about one launchable app.
+/// What the launcher knows about one thing it can launch.
 library;
+
+/// An entry is either an installed app or a shortcut another app has pinned
+/// here — a folder from a file manager, a conversation from a chat app. They
+/// sit in the same list so cards, search and filing do not have to know the
+/// difference; only launching and drawing an icon do.
+enum LaunchKind { app, shortcut }
 
 class LaunchableApp {
   const LaunchableApp({
@@ -7,7 +13,19 @@ class LaunchableApp {
     required this.activityName,
     required this.label,
     this.isSystem = false,
+    this.kind = LaunchKind.app,
+    this.shortcutId,
   });
+
+  /// A shortcut pinned by another app.
+  const LaunchableApp.shortcut({
+    required this.packageName,
+    required String id,
+    required this.label,
+  })  : shortcutId = id,
+        kind = LaunchKind.shortcut,
+        activityName = '',
+        isSystem = false;
 
   final String packageName;
 
@@ -18,21 +36,49 @@ class LaunchableApp {
   final String label;
   final bool isSystem;
 
-  /// Stable identity for ordering and pinning.
-  String get id => '$packageName/$activityName';
+  final LaunchKind kind;
+
+  /// Set only for [LaunchKind.shortcut].
+  final String? shortcutId;
+
+  bool get isShortcut => kind == LaunchKind.shortcut;
+
+  /// Stable identity for ordering and filing.
+  ///
+  /// Shortcuts are prefixed so they can never collide with an app whose
+  /// activity happens to share the name, and so an id read back from an old
+  /// deck still says which kind it was.
+  String get id => isShortcut
+      ? 'shortcut:$packageName/$shortcutId'
+      : '$packageName/$activityName';
 
   Map<String, dynamic> toJson() => {
         'packageName': packageName,
         'activityName': activityName,
         'label': label,
         'isSystem': isSystem,
+        if (isShortcut) 'kind': 'shortcut',
+        if (shortcutId != null) 'shortcutId': shortcutId,
       };
 
-  static LaunchableApp fromJson(Map<String, dynamic> json) => LaunchableApp(
-        packageName: json['packageName'] as String,
-        activityName: (json['activityName'] as String?) ?? '',
-        label: (json['label'] as String?) ?? json['packageName'] as String,
-        isSystem: json['isSystem'] as bool? ?? false,
+  static LaunchableApp fromJson(Map<String, dynamic> json) {
+    final shortcutId = json['shortcutId'] as String?;
+    final isShortcut = json['kind'] == 'shortcut' && shortcutId != null;
+    return LaunchableApp(
+      packageName: json['packageName'] as String,
+      activityName: (json['activityName'] as String?) ?? '',
+      label: (json['label'] as String?) ?? json['packageName'] as String,
+      isSystem: json['isSystem'] as bool? ?? false,
+      kind: isShortcut ? LaunchKind.shortcut : LaunchKind.app,
+      shortcutId: shortcutId,
+    );
+  }
+
+  static LaunchableApp shortcutFromPlatform(Map<Object?, Object?> map) =>
+      LaunchableApp.shortcut(
+        packageName: map['packageName'] as String,
+        id: map['shortcutId'] as String,
+        label: (map['label'] as String?) ?? map['shortcutId'] as String,
       );
 
   static LaunchableApp fromPlatform(Map<Object?, Object?> map) => LaunchableApp(
