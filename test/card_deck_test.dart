@@ -140,7 +140,58 @@ void main() {
     });
   });
 
+  group('assignAll', () {
+    test('files a batch onto one card', () {
+      var deck = CardDeck.seed();
+      final id = deck.folders.first.id;
+      deck = deck.assignAll([idOf('com.a'), idOf('com.b')], id);
+      expect(deck.cards[deck.indexOfId(id)].appIds,
+          [idOf('com.a'), idOf('com.b')]);
+    });
+
+    test('moves apps off whatever card they were on', () {
+      var deck = CardDeck.seed();
+      final first = deck.folders[0].id;
+      final second = deck.folders[1].id;
+      deck = deck.assign(idOf('com.a'), first);
+      deck = deck.assignAll([idOf('com.a'), idOf('com.b')], second);
+      expect(deck.folders[0].appIds, isEmpty);
+      expect(deck.cardIdFor(idOf('com.a')), second);
+    });
+
+    test('does not duplicate an app already on the target card', () {
+      var deck = CardDeck.seed();
+      final id = deck.folders.first.id;
+      deck = deck.assign(idOf('com.a'), id).assignAll([idOf('com.a')], id);
+      expect(deck.cards[deck.indexOfId(id)].appIds, hasLength(1));
+    });
+
+    test('an empty batch changes nothing', () {
+      final deck = CardDeck.seed();
+      final before = deck.folders.map((c) => c.appIds).toList();
+      final after = deck.assignAll(const [], deck.folders.first.id);
+      expect(after.folders.map((c) => c.appIds), before);
+    });
+  });
+
   group('reorder', () {
+    test('matches what a ReorderableListView reports', () {
+      // The edit screen uses onReorderItem, which hands back a newIndex
+      // already adjusted for the removed row — the index CardDeck.reorder
+      // wants. These pin that the two agree.
+      const deck = CardDeck([
+        DeckCard(id: 'a', name: 'a', colorKey: 'cyan', iconKey: 'folder'),
+        DeckCard(id: 'b', name: 'b', colorKey: 'cyan', iconKey: 'folder'),
+        DeckCard(id: 'c', name: 'c', colorKey: 'cyan', iconKey: 'folder'),
+      ]);
+      // Dragging 'a' below 'b' reports (0, 1).
+      expect(deck.reorder(0, 1).folders.map((c) => c.id), ['b', 'a', 'c']);
+      // Dragging 'a' to the end reports (0, 2).
+      expect(deck.reorder(0, 2).folders.map((c) => c.id), ['b', 'c', 'a']);
+      // Dragging 'c' to the top reports (2, 0).
+      expect(deck.reorder(2, 0).folders.map((c) => c.id), ['c', 'a', 'b']);
+    });
+
     test('moves a card and keeps every other one', () {
       final deck = CardDeck.seed();
       final names = deck.folders.map((c) => c.name).toList();

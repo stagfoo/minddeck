@@ -1,0 +1,172 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:minddeck/card_deck.dart';
+import 'package:minddeck/edit_deck_screen.dart';
+import 'package:minddeck/models.dart';
+
+LaunchableApp app(String package, {String? label}) => LaunchableApp(
+      packageName: package,
+      activityName: '$package.Main',
+      label: label ?? package.split('.').last,
+    );
+
+String idOf(String package) => '$package/$package.Main';
+
+final installed = [
+  app('com.a', label: 'Alpha'),
+  app('com.b', label: 'Bravo'),
+  app('com.c', label: 'Charlie'),
+];
+
+Future<void> pump(
+  WidgetTester tester,
+  CardDeck deck, {
+  Size size = const Size(393, 451),
+  ValueChanged<CardDeck>? onChanged,
+}) async {
+  tester.view.physicalSize = size * 3;
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
+
+  await tester.pumpWidget(MaterialApp(
+    home: EditDeckScreen(
+      deck: deck,
+      installed: installed,
+      onDeckChanged: onChanged ?? (_) {},
+    ),
+  ));
+  await tester.pumpAndSettle();
+}
+
+/// The outer reorderable list. Each card also holds a horizontal app row, so a
+/// bare Scrollable finder picks the wrong one.
+Finder get deckList => find.byType(Scrollable).first;
+
+void main() {
+  group('the screen', () {
+    testWidgets('lists every card and does not overflow', (tester) async {
+      await pump(tester, CardDeck.seed());
+      expect(tester.takeException(), isNull);
+      expect(find.text('daily'), findsOneWidget);
+    });
+
+    testWidgets('scrolls, so a long deck stays reachable', (tester) async {
+      // The whole reason dragging is confined to the handle: this list has to
+      // be able to scroll.
+      var deck = CardDeck.seed();
+      for (var i = 0; i < 8; i++) {
+        deck = deck.addCard('extra $i');
+      }
+      await pump(tester, deck);
+      final last = find.text('extra 7');
+      await tester.scrollUntilVisible(last, 100, scrollable: deckList);
+      expect(last, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('shows a move handle on every card', (tester) async {
+      // Tall surface: the list only builds the rows it can show, so a
+      // phone-sized viewport would find fewer handles than there are cards.
+      final deck = CardDeck.seed();
+      await pump(tester, deck, size: const Size(393, 1000));
+      expect(
+        find.byType(ReorderableDragStartListener),
+        findsNWidgets(deck.folders.length),
+      );
+    });
+
+    testWidgets('all apps is shown last with no handle of its own',
+        (tester) async {
+      await pump(tester, CardDeck.seed());
+      final footer = find.textContaining('always last');
+      await tester.scrollUntilVisible(footer, 100, scrollable: deckList);
+      expect(footer, findsOneWidget);
+      // The footer is not part of the reorderable list, so it carries no
+      // handle of its own — asserted against the footer's own subtree rather
+      // than a global count, which only reflects whatever is on screen.
+      expect(
+        find.descendant(
+          of: find.ancestor(of: footer, matching: find.byType(Opacity)).first,
+          matching: find.byType(ReorderableDragStartListener),
+        ),
+        findsNothing,
+      );
+    });
+  });
+
+  group('apps on a card', () {
+    testWidgets('are shown, with an add button beside them', (tester) async {
+      final deck = CardDeck.seed().assign(idOf('com.a'), 'card-seed-0');
+      await pump(tester, deck, size: const Size(393, 1000));
+      expect(find.text('Alpha'), findsOneWidget);
+      // One "add" per folder card.
+      expect(find.text('add'), findsNWidgets(deck.folders.length));
+    });
+
+    testWidgets('tapping an app takes it off the card', (tester) async {
+      final deck = CardDeck.seed().assign(idOf('com.a'), 'card-seed-0');
+      await pump(tester, deck);
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+      expect(find.text('Alpha'), findsNothing);
+    });
+
+    testWidgets('add opens a picker listing the installed apps',
+        (tester) async {
+      await pump(tester, CardDeck.seed());
+      await tester.tap(find.text('add').first);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Add to'), findsOneWidget);
+      expect(find.text('Alpha'), findsOneWidget);
+      expect(find.text('Bravo'), findsOneWidget);
+    });
+
+    testWidgets('the picker files everything picked at once', (tester) async {
+      var latest = CardDeck.seed();
+      await pump(tester, latest, onChanged: (value) => latest = value);
+      await tester.tap(find.text('add').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Alpha'));
+      await tester.tap(find.text('Bravo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add 2'), findsOneWidget);
+
+      await tester.tap(find.text('Add 2'));
+      await tester.pumpAndSettle();
+
+      expect(latest.folders.first.appIds,
+          containsAll([idOf('com.a'), idOf('com.b')]));
+    });
+
+    testWidgets('the picker will not add before anything is picked',
+        (tester) async {
+      await pump(tester, CardDeck.seed());
+      await tester.tap(find.text('add').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Pick some apps'), findsOneWidget);
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets('an app already on the card cannot be added twice',
+        (tester) async {
+      final deck = CardDeck.seed().assign(idOf('com.a'), 'card-seed-0');
+      await pump(tester, deck);
+      await tester.tap(find.text('add').first);
+      await tester.pumpAndSettle();
+      expect(find.text('already on this card'), findsOneWidget);
+    });
+
+    testWidgets('an app filed elsewhere says where it will move from',
+        (tester) async {
+      final deck = CardDeck.seed().assign(idOf('com.a'), 'card-seed-1');
+      await pump(tester, deck);
+      await tester.tap(find.text('add').first);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('will move here'), findsOneWidget);
+    });
+  });
+}

@@ -182,6 +182,26 @@ class CardDeck {
     ]);
   }
 
+  /// Files several apps at once, for the add-apps picker. Same rule as
+  /// [assign]: each app ends up on this card and nowhere else.
+  CardDeck assignAll(Iterable<String> appIds, String cardId) {
+    final moving = appIds.toSet();
+    return normalised([
+      for (final card in folders)
+        if (card.id == cardId)
+          card.copyWith(appIds: [
+            ...card.appIds.where((existing) => !moving.contains(existing)),
+            ...moving,
+          ])
+        else
+          card.copyWith(
+            appIds: [
+              ...card.appIds.where((existing) => !moving.contains(existing)),
+            ],
+          ),
+    ]);
+  }
+
   CardDeck unassign(String appId) {
     return normalised([
       for (final card in folders)

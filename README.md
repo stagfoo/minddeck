@@ -27,23 +27,28 @@ rests there anyway. Swiping the stack and tapping the track work too.
 ## Cards
 
 - **Tap** a collapsed card to focus it; tap the focused card to open it.
-- **Hold** a card to enter **arrange mode**: the cards flatten to uniform rows
-  and wiggle, and you drag them to reorder. Tap a card there to edit its name,
-  colour and icon, or delete it. Done exits.
+- **Hold** a card (or tap **+**) to open **Edit deck** — the whole deck in one
+  scrolling list, every card showing what's on it.
 - Deleting a card doesn't remove its apps — they stop being filed and reappear
   under all apps.
 
-Arrange mode flattens every card to the same row on purpose: reordering a deck
-where one card is four times the height of its neighbours is guesswork, and
-uniform rows make the landing slot obvious. Nothing else listens for a vertical
-drag while arranging — not the focus swipe, not the knob, not a scroll view — so
-the reorder gesture is unambiguous. That is also why arrange mode never scrolls:
-the rows thin out to fit instead, because a drag that both reorders *and*
-scrolls is the conflict that makes these UIs feel broken.
+### Edit deck
 
-The dragged card follows your finger rather than snapping between slots, and the
-deck reorders live underneath it, so you see where it will land before you let
-go. All apps can't be dragged and nothing can be dropped behind it.
+Each row is a card with three things on it: a **move handle**, the **apps
+already filed there**, and a **+** to add more.
+
+- **Drag the handle** to move a card. Dragging is confined to the handle on
+  purpose — that is what lets the list scroll. A drag anywhere on the row would
+  fight the list's own scrolling, which is the conflict that makes these UIs
+  feel broken.
+- **Tap a card's name** to edit its colour, icon and name, or delete it.
+- **Tap +** for a searchable, multi-select picker: file a card's worth of apps
+  in one go rather than one sheet at a time. An app already on the card is
+  greyed out, and one filed elsewhere says which card it will move from.
+- **Tap an app** on a card to unfile it.
+
+All apps sits at the bottom with no handle and no +: it is the back of the deck
+and holds everything by definition.
 - **+** in the top strip adds a card and opens the editor on it.
 - Inside **all apps**, hold an app to file it under a card. An app lives on at
   most one card — two homes would show it twice and make removing it ambiguous.
