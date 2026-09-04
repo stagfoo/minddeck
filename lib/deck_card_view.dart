@@ -31,6 +31,7 @@ class DeckCardView extends StatelessWidget {
     this.arranging = false,
     this.wigglePhase = 0,
     this.lifted = false,
+    this.flushTop = false,
   });
 
   final DeckCard card;
@@ -54,6 +55,14 @@ class DeckCardView extends StatelessWidget {
   /// This is the card currently under the finger.
   final bool lifted;
 
+  /// Square off the top corners.
+  ///
+  /// The focused card's top edge meets the bottom edge of the card in front of
+  /// it exactly. Rounding there curves away from a card that ends on the same
+  /// line, so the background shows through as two dark notches. Squared, the
+  /// card in front simply shingles over it.
+  final bool flushTop;
+
   @override
   Widget build(BuildContext context) {
     final color = colorOf(card.colorKey);
@@ -66,7 +75,10 @@ class DeckCardView extends StatelessWidget {
         height: height,
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(DeckMetrics.cardRadius),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(flushTop ? 0 : DeckMetrics.cardRadius),
+            bottom: const Radius.circular(DeckMetrics.cardRadius),
+          ),
           // A covered card casts a shadow onto the one behind it. Without this
           // the overlap reads as flat stripes rather than stacked cards.
           boxShadow: [

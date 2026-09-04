@@ -95,6 +95,55 @@ void main() {
     });
   });
 
+  group('corners', () {
+    BorderRadius radiusOf(WidgetTester tester) {
+      final container = tester.widget<AnimatedContainer>(
+        find.byType(AnimatedContainer).first,
+      );
+      return ((container.decoration! as BoxDecoration).borderRadius!
+          as BorderRadius);
+    }
+
+    testWidgets('a flush card squares only its top corners', (tester) async {
+      // Its top edge lands exactly on the bottom edge of the card in front, so
+      // rounding there would show the background through as two dark notches.
+      await tester.pumpWidget(host(
+        DeckCardView(
+          card: card,
+          height: 158,
+          focused: true,
+          flushTop: true,
+          apps: const [],
+          totalInstalled: 40,
+          onTap: () {},
+          onAppTap: (_) {},
+        ),
+      ));
+      final radius = radiusOf(tester);
+      expect(radius.topLeft, Radius.zero);
+      expect(radius.topRight, Radius.zero);
+      expect(radius.bottomLeft.x, greaterThan(0));
+      expect(radius.bottomRight.x, greaterThan(0));
+    });
+
+    testWidgets('an ordinary card keeps all four rounded', (tester) async {
+      await tester.pumpWidget(host(
+        DeckCardView(
+          card: card,
+          height: 158,
+          focused: true,
+          apps: const [],
+          totalInstalled: 40,
+          onTap: () {},
+          onAppTap: (_) {},
+        ),
+      ));
+      final radius = radiusOf(tester);
+      expect(radius.topLeft.x, greaterThan(0));
+      expect(radius.bottomLeft.x, greaterThan(0));
+    });
+  });
+
   group('apps on the card', () {
     testWidgets('are shown and are tappable', (tester) async {
       LaunchableApp? tapped;

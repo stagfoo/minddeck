@@ -209,6 +209,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 card: _deck[i],
                 height: spec.heightOf(i),
                 focused: i == spec.focusedIndex,
+                // Only when something is actually in front of it: the first
+                // card has nothing above, so its rounded top reads correctly
+                // against the background.
+                flushTop: i == spec.focusedIndex && i > 0,
                 apps: _deck[i].resolve(_installed),
                 totalInstalled: _installed.length,
                 onTap: () => i == _focused
