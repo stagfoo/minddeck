@@ -50,9 +50,10 @@ already filed there**, and a **+** to add more.
 - **Tap the card** — anywhere on it — to edit its colour, icon and name, or
   delete it. A small pencil marks it. The app chips, the + and the handle are
   children, so they are hit first and keep doing their own jobs.
-- **Tap +** for a searchable, multi-select picker: file a card's worth of apps
-  in one go rather than one sheet at a time. An app already on the card is
-  greyed out, and one filed elsewhere says which card it will move from.
+- **Tap +** for a searchable, multi-select picker — a full screen, not a bottom
+  sheet, so it never has to fight the keyboard for room. File a card's worth of
+  apps in one go rather than one at a time. An app already on the card is greyed
+  out, and one filed elsewhere says which card it will move from.
 - **Tap an app** on a card to unfile it.
 
 All apps sits at the bottom with no handle and no +: it is the back of the deck
