@@ -6,6 +6,8 @@ Future<void> pump(
   WidgetTester tester, {
   VoidCallback? onAdd,
   VoidCallback? onSettings,
+  VoidCallback? onRefresh,
+  bool refreshing = false,
   VoidCallback? onLongPressSettings,
 }) async {
   tester.view.physicalSize = const Size(393, 451) * 3;
@@ -20,13 +22,20 @@ Future<void> pump(
           DeckActions(
             onAdd: onAdd ?? () {},
             onSettings: onSettings ?? () {},
+            onRefresh: onRefresh ?? () {},
+            refreshing: refreshing,
             onLongPressSettings: onLongPressSettings,
           ),
         ],
       ),
     ),
   ));
-  await tester.pumpAndSettle();
+  // A spinner animates forever, so settling would never return.
+  if (refreshing) {
+    await tester.pump();
+  } else {
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
@@ -42,12 +51,30 @@ void main() {
     expect(add.top, greaterThan(screen.height / 2));
   });
 
-  testWidgets('add comes before settings', (tester) async {
+  testWidgets('add, refresh then settings, left to right', (tester) async {
     await pump(tester);
-    expect(
-      tester.getRect(find.byIcon(Icons.add_rounded)).left,
-      lessThan(tester.getRect(find.byIcon(Icons.settings_outlined)).left),
-    );
+    final add = tester.getRect(find.byIcon(Icons.add_rounded)).left;
+    final refresh = tester.getRect(find.byIcon(Icons.refresh_rounded)).left;
+    final settings = tester.getRect(find.byIcon(Icons.settings_outlined)).left;
+    expect(add, lessThan(refresh));
+    expect(refresh, lessThan(settings));
+  });
+
+  testWidgets('refresh fires', (tester) async {
+    var refreshed = 0;
+    await pump(tester, onRefresh: () => refreshed++);
+    await tester.tap(find.byIcon(Icons.refresh_rounded));
+    expect(refreshed, 1);
+  });
+
+  testWidgets('a refresh in flight shows a spinner and cannot be re-tapped',
+      (tester) async {
+    var refreshed = 0;
+    await pump(tester, refreshing: true, onRefresh: () => refreshed++);
+    expect(find.byIcon(Icons.refresh_rounded), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.tap(find.byType(CircularProgressIndicator));
+    expect(refreshed, 0);
   });
 
   testWidgets('both buttons fire', (tester) async {

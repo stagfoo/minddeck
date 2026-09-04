@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'card_deck.dart';
+import 'app_cache.dart';
 import 'app_menu_sheet.dart';
 import 'deck_card_view.dart';
 import 'deck_actions.dart';
@@ -24,8 +25,10 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver {
   final _store = DeckStore();
+  final _appCache = AppCache();
 
   List<LaunchableApp> _installed = const [];
   CardDeck _deck = CardDeck.normalised(const []);
@@ -43,10 +46,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   bool _isDefault = true;
   StreamSubscription<String>? _packageSub;
+  bool _refreshing = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
     _packageSub =
         LauncherBridge.instance.packageChanges.listen((_) => _refreshApps());
@@ -59,9 +64,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _packageSub?.cancel();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// Coming back to the launcher is the moment anything missed by the package
+  /// broadcasts would show up — a shortcut added, an app renamed, a profile
+  /// changed. The refresh is off the critical path and only redraws if the list
+  /// actually moved, so paying it on every resume costs nothing visible.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshApps();
   }
 
   Future<void> _openEditDeck() async {
@@ -78,22 +93,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _load() async {
-    // The deck comes from local storage and the platform calls do not, so the
-    // cards are drawn from the first frame and the rest of the phone is asked
-    // about afterwards. Waiting on all of it behind a spinner meant every cold
-    // start — which for a home app is every swipe up that had to restart it —
-    // showed a loading screen where the launcher should be.
-    var deck = await _store.load();
-    if (deck == null || deck.folders.isEmpty) {
+    // The deck and the app snapshot both come from local storage, so the real
+    // launcher — cards, and the apps on them — is on screen from the first
+    // frame. The platform is asked afterwards and only redraws if it disagrees.
+    var loaded = await _store.load();
+    if (loaded == null || loaded.folders.isEmpty) {
       // First run: a stack with nothing but "all apps" looks broken, and naming
       // a few starter cards is a better first impression than an empty screen.
-      deck = CardDeck.seed();
-      await _store.save(deck);
+      loaded = CardDeck.seed();
+      await _store.save(loaded);
     }
+    final deck = loaded;
+    final cached = await _appCache.load();
 
     if (!mounted) return;
     setState(() {
-      _deck = deck!;
+      _deck = deck;
+      if (cached != null) {
+        _installed = cached.apps;
+        _appsByCard = _resolveApps(deck, cached.apps);
+      }
       _loading = false;
     });
 
@@ -108,20 +127,53 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final apps = results[0] as List<LaunchableApp>;
     setState(() {
-      _installed = apps;
       _metrics = results[1] as ScreenMetrics;
       _isDefault = results[2] as bool;
-      _appsByCard = _resolveApps(_deck, apps);
     });
+    await _adopt(apps);
   }
 
-  Future<void> _refreshApps() async {
-    final apps = await LauncherBridge.instance.listApps();
+  /// Takes a freshly fetched list, redrawing and rewriting the snapshot only if
+  /// it differs from what is already shown.
+  Future<void> _adopt(List<LaunchableApp> apps) async {
+    if (!appListsDiffer(_installed, apps)) return;
     if (!mounted) return;
     setState(() {
       _installed = apps;
       _appsByCard = _resolveApps(_deck, apps);
     });
+    await _appCache.save(apps);
+  }
+
+  Future<void> _refreshApps() async {
+    final apps = await LauncherBridge.instance.listApps();
+    await _adopt(apps);
+  }
+
+  /// The manual refresh, for when something changed that neither a package
+  /// broadcast nor a resume caught.
+  Future<void> _refreshNow() async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final apps = await LauncherBridge.instance.listApps();
+      final changed = appListsDiffer(_installed, apps);
+      await _adopt(apps);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: DeckColors.surface,
+          duration: const Duration(seconds: 2),
+          content: Text(
+            changed ? 'App list updated' : '${apps.length} apps, nothing new',
+            style: deckText(size: 12),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
   }
 
   static Map<String, List<LaunchableApp>> _resolveApps(
@@ -164,6 +216,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     DeckActions(
                       onSettings: LauncherBridge.instance.openSettings,
                       onAdd: _openEditDeck,
+                      onRefresh: _refreshNow,
+                      refreshing: _refreshing,
                       onLongPressSettings: _showMetrics,
                     ),
                   ],

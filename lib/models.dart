@@ -21,6 +21,20 @@ class LaunchableApp {
   /// Stable identity for ordering and pinning.
   String get id => '$packageName/$activityName';
 
+  Map<String, dynamic> toJson() => {
+        'packageName': packageName,
+        'activityName': activityName,
+        'label': label,
+        'isSystem': isSystem,
+      };
+
+  static LaunchableApp fromJson(Map<String, dynamic> json) => LaunchableApp(
+        packageName: json['packageName'] as String,
+        activityName: (json['activityName'] as String?) ?? '',
+        label: (json['label'] as String?) ?? json['packageName'] as String,
+        isSystem: json['isSystem'] as bool? ?? false,
+      );
+
   static LaunchableApp fromPlatform(Map<Object?, Object?> map) => LaunchableApp(
         packageName: map['packageName'] as String,
         activityName: (map['activityName'] as String?) ?? '',

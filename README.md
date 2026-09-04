@@ -228,7 +228,28 @@ doing after any change to the Android side, not just before shipping.
 
 Two other things a launcher pays for on every cold start, both fixed here:
 the window Android paints before Flutter's first frame is the deck's own
-background rather than the template's white, and the home screen renders its
-cards from local storage immediately, asking the platform for the app list,
-screen metrics and default-launcher status concurrently afterwards instead of
-holding a spinner until all three return.
+background rather than the template's white, and the home screen renders from
+local storage immediately, asking the platform afterwards instead of holding a
+spinner until it answers.
+
+## The app snapshot
+
+Asking the platform for every launchable activity is the slowest thing the
+launcher does, and it sits on the path to the first useful frame: until it
+returns there are no apps on the cards and nothing to search. `lib/app_cache.dart`
+keeps a JSON snapshot of the list, so a cold start draws the real deck straight
+away and the platform's answer only redraws anything if it actually differs.
+
+The snapshot is a cache, never the truth. It is refreshed:
+
+- **when a package changes** — the Kotlin side broadcasts install, removal,
+  replacement and change events over an EventChannel;
+- **on resume**, which catches whatever those miss — a shortcut added, an app
+  relabelled, a locale change;
+- **on demand**, with the refresh button in the bottom-left row.
+
+A refresh that finds nothing new does not call `setState`. Since the launcher
+refreshes on every resume, rebuilding the deck each time you came home would
+undo the point of caching it — so `appListsDiffer` compares ids and labels
+first. An unreadable or future-schema snapshot is treated as a miss rather than
+an error, because refetching from the platform is always safe.
