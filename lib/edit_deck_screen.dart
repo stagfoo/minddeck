@@ -1,11 +1,9 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
+import 'app_icon.dart';
 import 'app_picker_sheet.dart';
 import 'card_deck.dart';
 import 'card_editor_sheet.dart';
-import 'launcher_bridge.dart';
 import 'models.dart';
 import 'theme.dart';
 
@@ -300,7 +298,11 @@ class _AppChip extends StatelessWidget {
               ),
               clipBehavior: Clip.antiAlias,
               padding: const EdgeInsets.all(5),
-              child: _Icon(packageName: app.packageName),
+              child: AppIconImage(
+                packageName: app.packageName,
+                size: 32,
+                color: DeckColors.onCard.withValues(alpha: 0.5),
+              ),
             ),
             const SizedBox(height: 3),
             Text(
@@ -365,30 +367,6 @@ class _AddChip extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _Icon extends StatelessWidget {
-  const _Icon({required this.packageName});
-
-  final String packageName;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Uint8List?>(
-      future: LauncherBridge.instance.appIcon(packageName),
-      builder: (context, snapshot) {
-        final bytes = snapshot.data;
-        if (bytes == null) {
-          return Icon(
-            Icons.android,
-            size: 18,
-            color: DeckColors.onCard.withValues(alpha: 0.5),
-          );
-        }
-        return Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true);
-      },
     );
   }
 }

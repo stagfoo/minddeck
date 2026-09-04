@@ -33,13 +33,33 @@ class _FolderScreenState extends State<FolderScreen> {
   late CardDeck _deck = widget.deck;
   String _query = '';
 
+  /// The card's apps, resolved once rather than on every build. For the
+  /// all-apps card that resolve sorts every app on the phone, and rebuilding
+  /// on each keystroke of the search field made typing sort a hundred apps per
+  /// character.
+  late List<LaunchableApp> _apps = _card.resolve(widget.installed);
+
   DeckCard get _card {
     final index = _deck.indexOfId(widget.card.id);
     return index >= 0 ? _deck[index] : widget.card;
   }
 
+  @override
+  void didUpdateWidget(FolderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.installed, widget.installed)) {
+      _apps = _card.resolve(widget.installed);
+    }
+  }
+
   void _update(CardDeck deck) {
-    setState(() => _deck = deck);
+    setState(() {
+      _deck = deck;
+      // Filing an app changes what this card holds, so the resolved list has
+      // to follow — but only then, not on every frame.
+      _apps = _deck[_deck.indexOfId(widget.card.id).clamp(0, _deck.length - 1)]
+          .resolve(widget.installed);
+    });
     widget.onDeckChanged(deck);
   }
 
@@ -47,7 +67,7 @@ class _FolderScreenState extends State<FolderScreen> {
   Widget build(BuildContext context) {
     final card = _card;
     final color = colorOf(card.colorKey);
-    final apps = searchApps(card.resolve(widget.installed), _query);
+    final apps = searchApps(_apps, _query);
 
     return Scaffold(
       backgroundColor: DeckColors.ground,

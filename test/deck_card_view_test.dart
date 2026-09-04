@@ -126,6 +126,50 @@ void main() {
       expect(radius.bottomRight.x, greaterThan(0));
     });
 
+    testWidgets('a bleed grows the box upward without moving the contents',
+        (tester) async {
+      // The bleed hides behind the card in front, filling the slivers its
+      // rounded bottom corners would otherwise leave. It must not shift what
+      // the card shows.
+      Rect stripOf(WidgetTester tester) => tester.getRect(find.text('media'));
+
+      await tester.pumpWidget(host(
+        DeckCardView(
+          card: card,
+          height: 158,
+          focused: true,
+          apps: const [],
+          totalInstalled: 40,
+          onTap: () {},
+          onAppTap: (_) {},
+        ),
+      ));
+      final withoutBleed = stripOf(tester);
+      final plainHeight = tester.getSize(find.byType(AnimatedContainer).first);
+
+      await tester.pumpWidget(host(
+        DeckCardView(
+          card: card,
+          height: 158,
+          focused: true,
+          flushTop: true,
+          topBleed: 14,
+          apps: const [],
+          totalInstalled: 40,
+          onTap: () {},
+          onAppTap: (_) {},
+        ),
+      ));
+      // The card animates its height, so measure once it has settled rather
+      // than at the first frame of the transition.
+      await tester.pumpAndSettle();
+      final bledHeight = tester.getSize(find.byType(AnimatedContainer).first);
+
+      expect(bledHeight.height, plainHeight.height + 14);
+      // The name strip is measured from the card's bottom, so it stays put.
+      expect(stripOf(tester).bottom, closeTo(withoutBleed.bottom + 14, 0.01));
+    });
+
     testWidgets('an ordinary card keeps all four rounded', (tester) async {
       await tester.pumpWidget(host(
         DeckCardView(

@@ -32,6 +32,7 @@ class DeckCardView extends StatelessWidget {
     this.wigglePhase = 0,
     this.lifted = false,
     this.flushTop = false,
+    this.topBleed = 0,
   });
 
   final DeckCard card;
@@ -63,6 +64,16 @@ class DeckCardView extends StatelessWidget {
   /// card in front simply shingles over it.
   final bool flushTop;
 
+  /// Extra height added above the card, hidden behind the card in front.
+  ///
+  /// Squaring this card's own corners was only half the notch: the card in
+  /// front keeps its rounded *bottom* corners, and those curve away from a card
+  /// that starts on the same line, leaving two slivers of background at the
+  /// edges. Running this card up behind the one in front fills them, and keeps
+  /// the shingle — the alternative, squaring the front card's bottom too, would
+  /// flatten that boundary into a plain seam.
+  final double topBleed;
+
   @override
   Widget build(BuildContext context) {
     final color = colorOf(card.colorKey);
@@ -72,7 +83,7 @@ class DeckCardView extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        height: height,
+        height: height + topBleed,
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.vertical(
@@ -90,12 +101,17 @@ class DeckCardView extends StatelessWidget {
           ],
         ),
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(child: arranging ? const SizedBox() : _body(color)),
-            _nameStrip(),
-          ],
+        child: Padding(
+          // The bleed is background only; the card's contents stay where the
+          // layout put them.
+          padding: EdgeInsets.only(top: topBleed),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: arranging ? const SizedBox() : _body(color)),
+              _nameStrip(),
+            ],
+          ),
         ),
       ),
     );

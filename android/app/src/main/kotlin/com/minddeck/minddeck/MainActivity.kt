@@ -35,7 +35,11 @@ class MainActivity : FlutterActivity() {
     private val methodChannelName = "minddeck/launcher"
     private val eventChannelName = "minddeck/packages"
 
-    private val worker = Executors.newSingleThreadExecutor()
+    // The package list is one big job; icons are a hundred small ones. On a
+    // single thread every icon queues behind every other icon and behind the
+    // listing itself, which is what made the all-apps view crawl. Four threads
+    // is enough to keep the decode busy without thrashing a phone this small.
+    private val worker = Executors.newFixedThreadPool(4)
     private val main = Handler(Looper.getMainLooper())
 
     private var packageEvents: EventChannel.EventSink? = null

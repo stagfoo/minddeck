@@ -1,8 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
-import 'launcher_bridge.dart';
+import 'app_icon.dart';
 import 'models.dart';
 import 'theme.dart';
 
@@ -48,7 +46,8 @@ class AppTile extends StatelessWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 padding: EdgeInsets.all(size * 0.13),
-                child: _Icon(packageName: app.packageName),
+                child: AppIconImage(
+                    packageName: app.packageName, size: size * 0.74),
               ),
               if (filed)
                 Positioned(
@@ -79,28 +78,6 @@ class AppTile extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _Icon extends StatelessWidget {
-  const _Icon({required this.packageName});
-
-  final String packageName;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Uint8List?>(
-      // The bridge memoises per package, so scrolling doesn't re-cross the
-      // channel for icons already fetched.
-      future: LauncherBridge.instance.appIcon(packageName),
-      builder: (context, snapshot) {
-        final bytes = snapshot.data;
-        if (bytes == null) {
-          return const Icon(Icons.android, color: DeckColors.textDim);
-        }
-        return Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true);
-      },
     );
   }
 }

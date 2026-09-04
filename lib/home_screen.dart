@@ -29,6 +29,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<LaunchableApp> _installed = const [];
   CardDeck _deck = CardDeck.normalised(const []);
+
+  /// Each card's apps, resolved once when the deck or the installed list
+  /// changes rather than in build. The all-apps card sorts every app on the
+  /// phone, and doing that per card per frame is a hundred-element sort in the
+  /// middle of an animation.
+  Map<String, List<LaunchableApp>> _appsByCard = const {};
   ScreenMetrics? _metrics;
   int _focused = 0;
   final _scroll = ScrollController();
@@ -89,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _installed = apps;
       _metrics = metrics;
       _deck = deck!;
+      _appsByCard = _resolveApps(deck, apps);
       _isDefault = isDefault;
       _loading = false;
     });
@@ -97,12 +104,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _refreshApps() async {
     final apps = await LauncherBridge.instance.listApps();
     if (!mounted) return;
-    setState(() => _installed = apps);
+    setState(() {
+      _installed = apps;
+      _appsByCard = _resolveApps(_deck, apps);
+    });
+  }
+
+  static Map<String, List<LaunchableApp>> _resolveApps(
+    CardDeck deck,
+    List<LaunchableApp> installed,
+  ) {
+    return {
+      for (final card in deck.cards) card.id: card.resolve(installed),
+    };
   }
 
   Future<void> _update(CardDeck deck) async {
     setState(() {
       _deck = deck;
+      _appsByCard = _resolveApps(deck, _installed);
       _focused = _focused.clamp(0, deck.length - 1);
     });
     await _store.save(deck);
@@ -204,17 +224,21 @@ class _HomeScreenState extends State<HomeScreen> {
               curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              top: spec.topOf(i),
-              height: spec.heightOf(i),
+              // The focused card runs up behind the one in front of it, so the
+              // background cannot show through that card's rounded bottom
+              // corners.
+              top: spec.topOf(i) - _bleedFor(i, spec),
+              height: spec.heightOf(i) + _bleedFor(i, spec),
               child: DeckCardView(
                 card: _deck[i],
                 height: spec.heightOf(i),
+                topBleed: _bleedFor(i, spec),
                 focused: i == spec.focusedIndex,
                 // Only when something is actually in front of it: the first
                 // card has nothing above, so its rounded top reads correctly
                 // against the background.
                 flushTop: i == spec.focusedIndex && i > 0,
-                apps: _deck[i].resolve(_installed),
+                apps: _appsByCard[_deck[i].id] ?? const [],
                 totalInstalled: _installed.length,
                 onTap: () => i == _focused
                     ? _openCard(_deck[i])
@@ -249,6 +273,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  /// How far card [i] runs up behind the card in front of it. Only the focused
+  /// card needs it, and only when something is actually in front.
+  double _bleedFor(int i, StackSpec spec) =>
+      i == spec.focusedIndex && i > 0 ? DeckMetrics.cardRadius : 0;
 
   /// Moves focus and, when the deck is long enough to scroll, brings the newly
   /// focused card into view — otherwise the knob can select a card that is off
