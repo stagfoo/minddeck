@@ -24,15 +24,15 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build debug APK
-        # arm64-only: a debug build bundles a full Flutter debug engine per
-        # ABI, so a universal APK is ~160MB against ~55MB for one. arm64-v8a
-        # covers every real Android phone from the last ~8 years.
-        run: flutter build apk --debug --target-platform android-arm64 --split-per-abi
+      - name: Build release APK
+        # Release, not debug: a debug build has no AOT snapshot and starts
+        # several times slower, which for a launcher is the whole experience.
+        # Signed with the committed debug.keystore either way.
+        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
-          name: minddeck-debug-apk
-          path: build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
+          name: minddeck-release-apk
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           retention-days: 14

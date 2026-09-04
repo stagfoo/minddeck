@@ -29,11 +29,15 @@ next_version="$major.$minor.$((patch + 1))"
 next_build=$((current_build + 1))
 tag="$next_version"
 
-# arm64-only, not the universal multi-ABI APK: a debug build bundles a full
-# Flutter debug engine per ABI, which makes a universal APK ~160MB against
-# ~75MB for one. arm64-v8a covers every real Android phone from the last ~8
-# years, and this is a personal sideload, not a public release.
-apk_path="build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk"
+# Release, not debug. A debug build runs Dart in the JIT with no AOT snapshot,
+# so it starts several times slower — and for a home launcher, cold start *is*
+# the experience: every swipe up pays it. It is also ~18MB against ~80MB.
+# Signed with the same committed debug.keystore, so it still installs as an
+# update over anything built before.
+#
+# arm64-only, not the universal multi-ABI APK: arm64-v8a covers every real
+# Android phone from the last ~8 years, and this is a personal sideload.
+apk_path="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
 
 echo "==> $app_name $current_version -> $next_version"
 
@@ -47,7 +51,7 @@ sed -i "s/^version: .*/version: $next_version+$next_build/" pubspec.yaml
 flutter pub get
 flutter analyze
 flutter test
-flutter build apk --debug --target-platform android-arm64 --split-per-abi
+flutter build apk --release --target-platform android-arm64 --split-per-abi
 
 git add pubspec.yaml
 git commit -m "Release $next_version"

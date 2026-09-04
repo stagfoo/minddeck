@@ -213,5 +213,21 @@ release signing) so local and CI builds share one signing identity and can
 install over each other. That matters more than usual here: replacing the home
 app means uninstalling it first, which drops you back on the stock launcher.
 
-Release APKs are arm64-only — a debug build bundles a full Flutter debug engine
-per ABI, so a universal APK is ~160MB against ~80MB for one.
+Releases are **release** builds, not debug ones — ~18MB against ~80MB, and more
+importantly AOT-compiled instead of running Dart in the JIT. For a home app cold
+start *is* the experience: every swipe up that had to restart the process pays
+it, and a debug build makes that several times slower, which reads as the
+launcher not being there. They are arm64-only and signed with the same committed
+`debug.keystore`, so they install as updates over anything built before.
+
+`android/app/proguard-rules.pro` exists because the release build could not run
+without it. `flutter analyze` and `flutter test` never touch Gradle, so a broken
+release config sits invisible until someone actually builds one — which is worth
+doing after any change to the Android side, not just before shipping.
+
+Two other things a launcher pays for on every cold start, both fixed here:
+the window Android paints before Flutter's first frame is the deck's own
+background rather than the template's white, and the home screen renders its
+cards from local storage immediately, asking the platform for the app list,
+screen metrics and default-launcher status concurrently afterwards instead of
+holding a spinner until all three return.

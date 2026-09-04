@@ -78,26 +78,40 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _load() async {
-    final apps = await LauncherBridge.instance.listApps();
-    final metrics = await LauncherBridge.instance.screenMetrics();
-    final isDefault = await LauncherBridge.instance.isDefaultLauncher();
+    // The deck comes from local storage and the platform calls do not, so the
+    // cards are drawn from the first frame and the rest of the phone is asked
+    // about afterwards. Waiting on all of it behind a spinner meant every cold
+    // start — which for a home app is every swipe up that had to restart it —
+    // showed a loading screen where the launcher should be.
     var deck = await _store.load();
-
-    // First run: a stack with nothing but "all apps" looks broken, and naming
-    // a few starter cards is a better first impression than an empty screen.
     if (deck == null || deck.folders.isEmpty) {
+      // First run: a stack with nothing but "all apps" looks broken, and naming
+      // a few starter cards is a better first impression than an empty screen.
       deck = CardDeck.seed();
       await _store.save(deck);
     }
 
     if (!mounted) return;
     setState(() {
-      _installed = apps;
-      _metrics = metrics;
       _deck = deck!;
-      _appsByCard = _resolveApps(deck, apps);
-      _isDefault = isDefault;
       _loading = false;
+    });
+
+    // Concurrently, not one after another: these are three independent
+    // round-trips and listApps is by far the slowest of them.
+    final results = await Future.wait([
+      LauncherBridge.instance.listApps(),
+      LauncherBridge.instance.screenMetrics(),
+      LauncherBridge.instance.isDefaultLauncher(),
+    ]);
+    if (!mounted) return;
+
+    final apps = results[0] as List<LaunchableApp>;
+    setState(() {
+      _installed = apps;
+      _metrics = results[1] as ScreenMetrics;
+      _isDefault = results[2] as bool;
+      _appsByCard = _resolveApps(_deck, apps);
     });
   }
 
