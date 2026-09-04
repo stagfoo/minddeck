@@ -22,7 +22,9 @@ class DeckColors {
 }
 
 class DeckMetrics {
-  static const stripHeight = 40.0;
+  /// The action row along the bottom. Slim: it is two icons, and every pixel
+  /// it takes is one the deck does not get.
+  static const actionsHeight = 40.0;
   /// The full right band is the scrub area — a thin track would be a hairline
   /// target on a screen this small. The visible parts sit inside it.
   static const railWidth = 52.0;

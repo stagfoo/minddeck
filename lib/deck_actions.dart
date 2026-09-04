@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-/// The thin bar above the deck: just the two actions.
+/// Add a card, and open Android's settings.
 ///
-/// No clock — Android already draws one in the status bar a few pixels above,
-/// and two of them stacked was the first thing that looked wrong on the device.
-class StatusStrip extends StatelessWidget {
-  const StatusStrip({
+/// Along the bottom-left rather than the top, so nothing sits above the deck.
+/// A bar over the stack reads as a gap the cards start below, which undoes the
+/// impression that they are a deck resting on the screen — and the top edge is
+/// where the front card belongs. Down here the row shares the space the system
+/// gesture bar already occupies.
+class DeckActions extends StatelessWidget {
+  const DeckActions({
     super.key,
     required this.onSettings,
     required this.onAdd,
@@ -25,15 +28,15 @@ class StatusStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: DeckMetrics.stripHeight,
+      height: DeckMetrics.actionsHeight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.only(left: DeckMetrics.gutter - 4),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            _StripButton(icon: Icons.add_rounded, onTap: onAdd),
-            const SizedBox(width: 4),
-            _StripButton(
+            _ActionButton(icon: Icons.add_rounded, onTap: onAdd),
+            const SizedBox(width: 2),
+            _ActionButton(
               icon: Icons.settings_outlined,
               onTap: onSettings,
               onLongPress: onLongPressSettings,
@@ -45,8 +48,8 @@ class StatusStrip extends StatelessWidget {
   }
 }
 
-class _StripButton extends StatelessWidget {
-  const _StripButton({required this.icon, required this.onTap, this.onLongPress});
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({required this.icon, required this.onTap, this.onLongPress});
 
   final IconData icon;
   final VoidCallback onTap;

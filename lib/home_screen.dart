@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'card_deck.dart';
 import 'app_menu_sheet.dart';
 import 'deck_card_view.dart';
+import 'deck_actions.dart';
 import 'deck_store.dart';
 import 'edit_deck_screen.dart';
 import 'folder_screen.dart';
@@ -12,7 +13,6 @@ import 'launcher_bridge.dart';
 import 'models.dart';
 import 'side_rail.dart';
 import 'stack_layout.dart';
-import 'status_strip.dart';
 import 'theme.dart';
 
 /// The home screen: a vertical stack of coloured cards with a pull knob down
@@ -143,13 +143,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               : Column(
                   children: [
-                    StatusStrip(
+                    // Nothing above the deck: the front card starts at the top
+                    // edge of the screen.
+                    Expanded(child: _stack()),
+                    if (!_isDefault) _defaultLauncherBanner(),
+                    DeckActions(
                       onSettings: LauncherBridge.instance.openSettings,
                       onAdd: _openEditDeck,
                       onLongPressSettings: _showMetrics,
                     ),
-                    if (!_isDefault) _defaultLauncherBanner(),
-                    Expanded(child: _stack()),
                   ],
                 ),
         ),
@@ -184,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _stack() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(DeckMetrics.gutter, 6, 4, 10),
+      padding: const EdgeInsets.fromLTRB(DeckMetrics.gutter, 4, 4, 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

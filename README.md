@@ -27,6 +27,11 @@ rests there anyway. Swiping the stack and tapping the track work too.
 
 ## Cards
 
+Nothing sits above the deck: the front card starts at the top edge of the
+screen, and **+** and settings live along the bottom-left instead. A bar over
+the stack reads as a gap the cards start below, which undoes the impression
+that they are a deck resting on the screen.
+
 - **Tap** a collapsed card to focus it; tap the focused card to open it.
 - **Hold** a card (or tap **+**) to open **Edit deck** — the whole deck in one
   scrolling list, every card showing what's on it.
