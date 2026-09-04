@@ -1,46 +1,64 @@
 #!/usr/bin/env bash
-# Builds a debug APK locally and publishes it as a GitHub release asset,
-# for when CI budget is tight. Uses the same debug.keystore committed to
-# the repo that CI builds use, so this can still install as an update over
-# a previously CI-built (or previously locally-built) copy.
+# Builds a debug APK locally and publishes it as a GitHub release asset, for
+# when CI budget is tight. Uses the same debug.keystore committed to the repo
+# that CI builds use, so this can still install as an update over a previously
+# CI-built (or previously locally-built) copy.
+#
+# The tag is exactly the app's version, with no "v" and no commit suffix, so it
+# matches the versionName inside the APK. Obtainium compares the version string
+# a release advertises against the version Android reports for the installed
+# app, and can only do that when the two are the same shape — a "v1.0.0-3d1885e"
+# tag against a "1.0.0" versionName is not.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 app_name=$(basename "$(pwd)")
-version=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}' | cut -d'+' -f1)
-sha=$(git rev-parse --short HEAD)
-tag="v${version}-${sha}"
-# arm64-only, not the universal multi-ABI APK: a debug build bundles a
-# full Flutter debug engine per ABI, which makes a universal APK ~160MB
-# against ~55MB for one. arm64-v8a covers every real Android phone from
-# the last ~8 years, and this is a personal sideload, not a public release.
+
+current=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}')
+current_version=${current%%+*}
+current_build=${current##*+}
+
+# Every release gets its own version. Shipping the same version twice leaves
+# Obtainium with nothing to compare, and leaves Android with no reason to treat
+# the APK as an update.
+major=$(echo "$current_version" | cut -d. -f1)
+minor=$(echo "$current_version" | cut -d. -f2)
+patch=$(echo "$current_version" | cut -d. -f3)
+next_version="$major.$minor.$((patch + 1))"
+next_build=$((current_build + 1))
+tag="$next_version"
+
+# arm64-only, not the universal multi-ABI APK: a debug build bundles a full
+# Flutter debug engine per ABI, which makes a universal APK ~160MB against
+# ~75MB for one. arm64-v8a covers every real Android phone from the last ~8
+# years, and this is a personal sideload, not a public release.
 apk_path="build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk"
 
-echo "==> $app_name $tag"
+echo "==> $app_name $current_version -> $next_version"
 
-# gh release create --target takes a commit the remote already has; without
-# this the whole build runs and then fails with "target_commitish is invalid".
-if ! git ls-remote --exit-code origin "$(git rev-parse HEAD)" >/dev/null 2>&1 \
-   && [ -n "$(git log --oneline @{u}..HEAD 2>/dev/null || echo unpushed)" ]; then
-  echo "==> HEAD is not on origin yet; pushing first"
-  git push origin HEAD
+if gh release view "$tag" >/dev/null 2>&1; then
+  echo "!! Release $tag already exists; bump past it or delete it first." >&2
+  exit 1
 fi
+
+sed -i "s/^version: .*/version: $next_version+$next_build/" pubspec.yaml
 
 flutter pub get
 flutter analyze
 flutter test
 flutter build apk --debug --target-platform android-arm64 --split-per-abi
 
-if gh release view "$tag" >/dev/null 2>&1; then
-  echo "==> Release $tag already exists, uploading APK (clobber)"
-  gh release upload "$tag" "$apk_path" --clobber
-else
-  echo "==> Creating release $tag"
-  gh release create "$tag" "$apk_path" \
-    --title "$app_name $tag" \
-    --notes "Local debug build of $sha." \
-    --target "$(git rev-parse HEAD)"
-fi
+git add pubspec.yaml
+git commit -m "Release $next_version"
+
+# gh release create --target takes a commit the remote already has; without
+# this the whole build runs and then fails with "target_commitish is invalid".
+git push origin HEAD
+
+gh release create "$tag" "$apk_path" \
+  --title "$app_name $next_version" \
+  --notes "$(git log -1 --pretty=%s)" \
+  --target "$(git rev-parse HEAD)"
 
 gh release view "$tag" --json url --jq .url

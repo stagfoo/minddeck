@@ -162,6 +162,33 @@ at three weights, loading the font file itself, because `flutter test` otherwise
 renders with a placeholder whose glyphs are all the same width and every weight
 would measure identically.
 
+## Installing with Obtainium
+
+[Obtainium](https://github.com/ImranR98/Obtainium) tracks the GitHub releases
+and installs updates, which beats downloading an APK by hand every time.
+
+**Add it:** [obtainium://app/…](obtainium://app/%7B%22id%22%3A%22com.minddeck.minddeck%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fstagfoo%2Fminddeck%22%2C%22author%22%3A%22stagfoo%22%2C%22name%22%3A%22MindDeck%22%7D) — or paste
+`https://github.com/stagfoo/minddeck` into Obtainium's Add App screen. The
+config the link carries is just id, url, author and name; no extra settings are
+needed, because releases are shaped to Obtainium's defaults:
+
+- **The tag is exactly the version** — `1.0.1`, not `v1.0.1-3d1885e`. Obtainium
+  compares the version a release advertises against the version Android reports
+  for the installed app, and can only do that when the two are the same shape.
+  A tag carrying a `v` and a commit sha would need a `versionExtractionRegEx`
+  set by hand.
+- **Every release bumps the version and the build number.** Shipping the same
+  version twice leaves Obtainium nothing to compare and Android no reason to
+  treat the APK as an update.
+- **One APK asset per release**, so no `apkFilterRegEx` is needed.
+
+**This repo is private**, so Obtainium needs a GitHub personal access token with
+`repo` scope, under Settings → Source-specific → GitHub. Without one it cannot
+see the releases at all. Making the repo public would remove that step.
+
+Releases before `1.0.1` used the old `v1.0.0-<sha>` tag format and will not
+compare cleanly; the first Obtainium-tracked version is `1.0.1`.
+
 ## Building
 
 ```sh
