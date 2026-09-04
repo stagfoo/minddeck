@@ -84,10 +84,10 @@ class _CardApp extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 9.5,
+              style: deckText(
+                size: 9.5,
+                weight: 600,
                 height: 1.1,
-                fontWeight: FontWeight.w600,
                 color: DeckColors.onCard.withValues(alpha: 0.75),
               ),
             ),

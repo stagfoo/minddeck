@@ -105,10 +105,10 @@ class DeckCardView extends StatelessWidget {
                 card.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: deckText(
+                  size: 16,
+                  weight: 700,
                   color: DeckColors.onCard,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
                   letterSpacing: -0.3,
                   height: 1.1,
                 ),
@@ -117,10 +117,10 @@ class DeckCardView extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               card.isAllApps ? '$totalInstalled' : '${apps.length}',
-              style: TextStyle(
+              style: deckText(
+                size: 12,
+                weight: 700,
                 color: DeckColors.onCard.withValues(alpha: 0.5),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(width: 8),
@@ -145,10 +145,10 @@ class DeckCardView extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: Text(
             card.isAllApps ? 'nothing installed' : 'empty — hold to fill',
-            style: TextStyle(
+            style: deckText(
+              size: 12,
+              weight: 500,
               color: DeckColors.onCard.withValues(alpha: 0.5),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
             ),
           ),
         ),

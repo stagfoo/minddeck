@@ -22,3 +22,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    # Lexend, bundled rather than fetched with google_fonts: a launcher must
+    # draw its own labels without a network, and a first-run flash of a
+    # fallback font on the home screen would be the first thing you see.
+    # Variable font (a single wght axis file) under the SIL Open Font Licence
+    # 1.1 — assets/fonts/OFL.txt.
+    - family: Lexend
+      fonts:
+        - asset: assets/fonts/Lexend[wght].ttf

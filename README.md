@@ -140,6 +140,22 @@ card for an app that's gone.
 If any of those turn out to matter, forking [Fossify Launcher](https://github.com/FossifyOrg/Launcher)
 (Kotlin, small, readable) is the sane alternative base.
 
+## Type
+
+Labels are set in [Lexend](https://github.com/googlefonts/lexend) — bundled in
+`assets/fonts/`, not fetched with `google_fonts`: a launcher has to draw its own
+labels without a network, and a first-run flash of a fallback font on the home
+screen would be the first thing you ever see of it. SIL Open Font Licence 1.1,
+included as `assets/fonts/OFL.txt`.
+
+It ships as one variable font with a `wght` axis, so `deckText()` in
+`lib/theme.dart` sets both `fontVariations` and `fontWeight`. Measured on this
+engine `fontWeight` alone already drives the axis, so that is belt-and-braces
+rather than a workaround — and `test/font_test.dart` measures real glyph widths
+at three weights, loading the font file itself, because `flutter test` otherwise
+renders with a placeholder whose glyphs are all the same width and every weight
+would measure identically.
+
 ## Building
 
 ```sh

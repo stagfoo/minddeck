@@ -75,6 +75,36 @@ IconData iconOf(String key) {
   }
 }
 
+/// Text in Lexend at a given weight.
+///
+/// Lexend ships as one variable font with a wght axis. Measured on this engine,
+/// [TextStyle.fontWeight] alone does drive that axis — identical advance widths
+/// to setting [FontVariation] explicitly — so this is not working around a bug.
+/// Both are set anyway: the axis is then stated outright rather than depending
+/// on that mapping continuing to hold, and fontWeight keeps fallback fonts and
+/// any synthetic bolding honest. font_test.dart measures real widths, so if the
+/// mapping ever changes it fails rather than silently flattening every weight.
+TextStyle deckText({
+  required double size,
+  int weight = 400,
+  Color color = DeckColors.text,
+  double? letterSpacing,
+  double? height,
+}) {
+  return TextStyle(
+    fontFamily: 'Lexend',
+    fontSize: size,
+    color: color,
+    fontWeight: FontWeight.values.firstWhere(
+      (candidate) => candidate.value == weight,
+      orElse: () => FontWeight.normal,
+    ),
+    fontVariations: [FontVariation('wght', weight.toDouble())],
+    letterSpacing: letterSpacing,
+    height: height,
+  );
+}
+
 ThemeData buildDeckTheme() {
   return ThemeData(
     useMaterial3: true,
@@ -85,7 +115,9 @@ ThemeData buildDeckTheme() {
       primary: Color(0xFFFF4F00),
       onPrimary: DeckColors.onCard,
     ),
+    fontFamily: 'Lexend',
     textTheme: const TextTheme().apply(
+      fontFamily: 'Lexend',
       bodyColor: DeckColors.text,
       displayColor: DeckColors.text,
     ),
