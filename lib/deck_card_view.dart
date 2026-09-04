@@ -28,6 +28,9 @@ class DeckCardView extends StatelessWidget {
     required this.onAppTap,
     this.onLongPress,
     this.onAppLongPress,
+    this.arranging = false,
+    this.wigglePhase = 0,
+    this.lifted = false,
   });
 
   final DeckCard card;
@@ -40,10 +43,21 @@ class DeckCardView extends StatelessWidget {
   final VoidCallback? onLongPress;
   final ValueChanged<LaunchableApp>? onAppLongPress;
 
+  /// While arranging, the card shows only its name strip and wiggles. Its app
+  /// row is hidden — arrange mode is about position, and a row of tappable
+  /// icons inside something you are dragging is only a way to misfire.
+  final bool arranging;
+
+  /// Offsets each card's wiggle so the deck doesn't pulse in unison.
+  final double wigglePhase;
+
+  /// This is the card currently under the finger.
+  final bool lifted;
+
   @override
   Widget build(BuildContext context) {
     final color = colorOf(card.colorKey);
-    return GestureDetector(
+    final card_ = GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
       child: AnimatedContainer(
@@ -57,9 +71,9 @@ class DeckCardView extends StatelessWidget {
           // the overlap reads as flat stripes rather than stacked cards.
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: focused ? 0.55 : 0.4),
-              blurRadius: focused ? 20 : 10,
-              offset: Offset(0, focused ? 8 : 3),
+              color: Colors.black.withValues(alpha: lifted ? 0.7 : (focused ? 0.55 : 0.4)),
+              blurRadius: lifted ? 26 : (focused ? 20 : 10),
+              offset: Offset(0, lifted ? 12 : (focused ? 8 : 3)),
             ),
           ],
         ),
@@ -67,12 +81,15 @@ class DeckCardView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: _body(color)),
+            Expanded(child: arranging ? const SizedBox() : _body(color)),
             _nameStrip(),
           ],
         ),
       ),
     );
+
+    if (!arranging || card.isAllApps || lifted) return card_;
+    return Transform.rotate(angle: wigglePhase, child: card_);
   }
 
   /// The strip that stays visible when this card is covered.
@@ -107,7 +124,13 @@ class DeckCardView extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(iconOf(card.iconKey), size: 17, color: DeckColors.onCard),
+            Icon(
+              arranging && !card.isAllApps
+                  ? Icons.drag_indicator_rounded
+                  : iconOf(card.iconKey),
+              size: 17,
+              color: DeckColors.onCard,
+            ),
           ],
         ),
       ),

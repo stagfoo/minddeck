@@ -47,63 +47,17 @@ Future<void> tapDelete(WidgetTester tester) async {
 }
 
 void main() {
-  group('position', () {
-    testWidgets('reports the card unmoved when nothing is touched',
-        (tester) async {
-      await open(tester);
+  group('delete', () {
+    testWidgets('carries the card position through untouched', (tester) async {
+      // Reordering moved to a drag on the cards themselves; the sheet only
+      // passes the position along so the caller has one result shape.
+      await open(tester, position: 3);
       await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
-      // The caller skips the reorder entirely when the position is unchanged.
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Forward'), findsNothing);
+      expect(find.text('Back'), findsNothing);
     });
 
-    testWidgets('moving forward lowers the index', (tester) async {
-      await open(tester, position: 2);
-      expect(find.text('3 of 5'), findsOneWidget);
-      await tester.tap(find.text('Forward'));
-      await tester.pump();
-      expect(find.text('2 of 5'), findsOneWidget);
-    });
-
-    testWidgets('moving back raises it', (tester) async {
-      await open(tester, position: 2);
-      await tester.tap(find.text('Back'));
-      await tester.pump();
-      expect(find.text('4 of 5'), findsOneWidget);
-    });
-
-    testWidgets('the front of the deck is named, not numbered', (tester) async {
-      await open(tester, position: 1);
-      await tester.tap(find.text('Forward'));
-      await tester.pump();
-      expect(find.text('front of the deck'), findsOneWidget);
-    });
-
-    testWidgets('cannot be moved past either end', (tester) async {
-      await open(tester, position: 0);
-      for (var i = 0; i < 4; i++) {
-        await tester.tap(find.text('Forward'));
-        await tester.pump();
-      }
-      expect(find.text('front of the deck'), findsOneWidget);
-
-      for (var i = 0; i < 10; i++) {
-        await tester.tap(find.text('Back'));
-        await tester.pump();
-      }
-      expect(find.text('5 of 5'), findsOneWidget);
-    });
-
-    testWidgets('a single-card deck offers no move at all', (tester) async {
-      await open(tester, position: 0, folderCount: 1);
-      expect(find.text('front of the deck'), findsOneWidget);
-      await tester.tap(find.text('Back'));
-      await tester.pump();
-      expect(find.text('front of the deck'), findsOneWidget);
-    });
-  });
-
-  group('delete', () {
     testWidgets('asks before removing a card', (tester) async {
       await open(tester);
       await tapDelete(tester);

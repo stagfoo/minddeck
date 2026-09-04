@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'card_deck.dart';
 import 'card_editor_sheet.dart';
@@ -23,7 +24,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with TickerProviderStateMixin {
   final _store = DeckStore();
 
   List<LaunchableApp> _installed = const [];
@@ -32,6 +34,14 @@ class _HomeScreenState extends State<HomeScreen> {
   int _focused = 0;
   final _scroll = ScrollController();
   StackSpec? _lastSpec;
+
+  bool _arranging = false;
+  String? _draggingId;
+  double? _dragTop;
+  late final AnimationController _wiggle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
   bool _loading = true;
   bool _isDefault = true;
   StreamSubscription<String>? _packageSub;
@@ -53,7 +63,22 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _packageSub?.cancel();
     _scroll.dispose();
+    _wiggle.dispose();
     super.dispose();
+  }
+
+  void _startArranging() {
+    setState(() => _arranging = true);
+    _wiggle.repeat(reverse: true);
+  }
+
+  void _stopArranging() {
+    _wiggle.stop();
+    setState(() {
+      _arranging = false;
+      _draggingId = null;
+      _dragTop = null;
+    });
   }
 
   Future<void> _load() async {
@@ -113,7 +138,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       onAdd: _addCard,
                       onLongPressSettings: _showMetrics,
                     ),
-                    if (!_isDefault) _defaultLauncherBanner(),
+                    if (_arranging)
+                      _arrangeBar()
+                    else if (!_isDefault)
+                      _defaultLauncherBanner(),
                     Expanded(child: _stack()),
                   ],
                 ),
@@ -155,86 +183,238 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Expanded(
             child: LayoutBuilder(
-              builder: (context, constraints) {
-                final spec = solveStack(
-                  height: constraints.maxHeight,
-                  cardCount: _deck.length,
-                  focusedIndex: _focused,
-                );
-                // Kept so the knob can scroll a long deck to the card it just
-                // selected; a plain field, not setState, since this is build.
-                _lastSpec = spec;
-                final stack = SizedBox(
-                  height: spec.totalHeight,
-                  child: Stack(
-                    // Cards must be free to draw their shadow onto the card
-                    // behind, and the tail card runs past the stack the way a
-                    // fanned deck does — the scroll view clips it.
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Back to front: the last card — always all apps — is
-                      // painted first and stays behind everything, and the
-                      // first card sits at the front of the deck.
-                      for (final i in spec.paintOrder)
-                        AnimatedPositioned(
-                          key: ValueKey(_deck[i].id),
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          left: 0,
-                          right: 0,
-                          top: spec.topOf(i),
-                          height: spec.heightOf(i),
-                          child: DeckCardView(
-                            card: _deck[i],
-                            height: spec.heightOf(i),
-                            focused: i == spec.focusedIndex,
-                            apps: _deck[i].resolve(_installed),
-                            totalInstalled: _installed.length,
-                            onTap: () => i == _focused
-                                ? _openCard(_deck[i])
-                                : setState(() => _focused = i),
-                            onLongPress: () => _editCard(_deck[i]),
-                            onAppTap: (app) =>
-                                LauncherBridge.instance.launch(app.packageName),
-                            onAppLongPress: (app) => _showAppMenu(_deck[i], app),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-
-                return ClipRect(
-                  child: GestureDetector(
-                    // Swiping the stack moves focus. The app rows scroll
-                    // horizontally, so the vertical gesture stays free.
-                    onVerticalDragEnd: (details) {
-                      final velocity = details.primaryVelocity ?? 0;
-                      if (velocity < -200) {
-                        _moveFocus(1);
-                      } else if (velocity > 200) {
-                        _moveFocus(-1);
-                      }
-                    },
-                    child: spec.overflows
-                        // More cards than fit at readable sizes: scroll rather
-                        // than crush the strips until the names clip.
-                        ? SingleChildScrollView(
-                            controller: _scroll,
-                            physics: const ClampingScrollPhysics(),
-                            child: stack,
-                          )
-                        : stack,
-                  ),
-                );
-              },
+              builder: (context, constraints) => _arranging
+                  ? _arrangeStack(constraints)
+                  : _restingStack(constraints),
             ),
           ),
-          SideRail(
-            cardCount: _deck.length,
-            focusedIndex: _focused,
-            onFocusChanged: _focus,
-          ),
+          // One input mode at a time: while arranging, the knob would compete
+          // with the reorder drag for the same vertical gesture, so it goes.
+          if (!_arranging)
+            SideRail(
+              cardCount: _deck.length,
+              focusedIndex: _focused,
+              onFocusChanged: _focus,
+            )
+          else
+            const SizedBox(width: DeckMetrics.railWidth),
         ],
+      ),
+    );
+  }
+
+  Widget _restingStack(BoxConstraints constraints) {
+    final spec = solveStack(
+      height: constraints.maxHeight,
+      cardCount: _deck.length,
+      focusedIndex: _focused,
+    );
+    // Kept so the knob can scroll a long deck to the card it just selected; a
+    // plain field, not setState, since this is build.
+    _lastSpec = spec;
+
+    final stack = SizedBox(
+      height: spec.totalHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Back to front: the last card — always all apps — is painted first
+          // and stays behind everything.
+          for (final i in spec.paintOrder)
+            AnimatedPositioned(
+              key: ValueKey(_deck[i].id),
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              left: 0,
+              right: 0,
+              top: spec.topOf(i),
+              height: spec.heightOf(i),
+              child: DeckCardView(
+                card: _deck[i],
+                height: spec.heightOf(i),
+                focused: i == spec.focusedIndex,
+                apps: _deck[i].resolve(_installed),
+                totalInstalled: _installed.length,
+                onTap: () => i == _focused
+                    ? _openCard(_deck[i])
+                    : setState(() => _focused = i),
+                onLongPress: _startArranging,
+                onAppTap: (app) =>
+                    LauncherBridge.instance.launch(app.packageName),
+                onAppLongPress: (app) => _showAppMenu(_deck[i], app),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    return ClipRect(
+      child: GestureDetector(
+        onVerticalDragEnd: (details) {
+          final velocity = details.primaryVelocity ?? 0;
+          if (velocity < -200) {
+            _moveFocus(1);
+          } else if (velocity > 200) {
+            _moveFocus(-1);
+          }
+        },
+        child: spec.overflows
+            ? SingleChildScrollView(
+                controller: _scroll,
+                physics: const ClampingScrollPhysics(),
+                child: stack,
+              )
+            : stack,
+      ),
+    );
+  }
+
+  /// Arrange mode: uniform rows you drag to reorder.
+  ///
+  /// Nothing else here listens for a vertical drag — not the focus swipe, not
+  /// the knob, not a scroll view — so the reorder gesture is unambiguous.
+  Widget _arrangeStack(BoxConstraints constraints) {
+    final spec = solveArrangeStack(
+      height: constraints.maxHeight,
+      cardCount: _deck.length,
+    );
+
+    return ClipRect(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (final i in spec.paintOrder) _arrangeCard(spec, i),
+        ],
+      ),
+    );
+  }
+
+  Widget _arrangeCard(ArrangeSpec spec, int i) {
+    final card = _deck[i];
+    final dragging = card.id == _draggingId;
+    // The dragged card follows the finger rather than snapping between slots,
+    // so it stays under the thumb while the others animate around it.
+    final top = dragging && _dragTop != null ? _dragTop! : spec.topOf(i);
+
+    Widget view = AnimatedBuilder(
+      animation: _wiggle,
+      builder: (context, child) => DeckCardView(
+        card: card,
+        height: spec.heightOf(i),
+        focused: false,
+        apps: const [],
+        totalInstalled: _installed.length,
+        arranging: true,
+        lifted: dragging,
+        // Alternate the phase so the deck doesn't pulse in unison.
+        wigglePhase: (i.isEven ? 1 : -1) * 0.005 * (_wiggle.value * 2 - 1),
+        onTap: () => _editCard(card),
+        onAppTap: (_) {},
+      ),
+    );
+
+    if (card.isAllApps) {
+      // All apps is pinned to the back of the deck; there is nowhere for it to
+      // go, so it is dimmed and left undraggable.
+      view = Opacity(opacity: 0.55, child: view);
+    } else {
+      // The recogniser lives on the card, not on the stack, so the hit test
+      // answers "which card am I dragging" and no coordinate has to be mapped
+      // back to one.
+      view = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragStart: (_) => _beginDrag(spec, card),
+        onVerticalDragUpdate: (details) => _dragBy(spec, card, details.delta.dy),
+        onVerticalDragEnd: (_) => _endDrag(),
+        onVerticalDragCancel: _endDrag,
+        child: view,
+      );
+    }
+
+    // The dragged card must not animate — it is already following the finger.
+    return dragging
+        ? Positioned(
+            key: ValueKey(card.id),
+            left: 0,
+            right: 0,
+            top: top,
+            height: spec.heightOf(i),
+            child: view,
+          )
+        : AnimatedPositioned(
+            key: ValueKey(card.id),
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            left: 0,
+            right: 0,
+            top: top,
+            height: spec.heightOf(i),
+            child: view,
+          );
+  }
+
+  void _beginDrag(ArrangeSpec spec, DeckCard card) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _draggingId = card.id;
+      _dragTop = spec.topOf(_deck.indexOfId(card.id));
+    });
+  }
+
+  void _dragBy(ArrangeSpec spec, DeckCard card, double delta) {
+    final index = _deck.indexOfId(card.id);
+    if (index < 0) return;
+    final next = (_dragTop ?? spec.topOf(index)) + delta;
+    setState(() => _dragTop = next);
+
+    // Reorder live as the finger crosses a row, so the deck shows where the
+    // card will land rather than only revealing it on release. The probe is the
+    // middle of the card's own strip, which is the part the eye tracks.
+    final over = spec.indexForY(next + spec.cardHeight - spec.peek / 2);
+    final folders = _deck.folders;
+    final from = folders.indexWhere((entry) => entry.id == card.id);
+    // Clamped to the folders: all apps owns the back of the deck and nothing
+    // may be dragged past it.
+    final target = over.clamp(0, folders.length - 1);
+    if (from >= 0 && target != from) {
+      HapticFeedback.selectionClick();
+      _update(_deck.reorder(from, target));
+    }
+  }
+
+  void _endDrag() {
+    if (_draggingId == null) return;
+    setState(() {
+      _draggingId = null;
+      _dragTop = null;
+    });
+  }
+
+  Widget _arrangeBar() {
+    return Material(
+      color: DeckColors.surface,
+      child: InkWell(
+        onTap: _stopArranging,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            children: [
+              Icon(Icons.drag_indicator_rounded, size: 15, color: DeckColors.textDim),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Drag to reorder · tap a card to edit it',
+                  style: TextStyle(fontSize: 11, color: DeckColors.textDim),
+                ),
+              ),
+              Text('Done',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: DeckColors.text)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -247,7 +427,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!_scroll.hasClients) return;
     final spec = _lastSpec;
     if (spec == null || !spec.overflows) return;
-    final target = (spec.topOf(index) - spec.peek)
+    final target = (spec.revealTopOf(index) - spec.peek)
         .clamp(0.0, _scroll.position.maxScrollExtent);
     _scroll.animateTo(
       target,

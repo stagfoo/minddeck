@@ -229,6 +229,80 @@ void main() {
     });
   });
 
+  group('solveArrangeStack', () {
+    test('flattens every card to the same strip', () {
+      // Reordering a deck where one card is four times its neighbours' height
+      // is guesswork; uniform rows make the landing slot obvious.
+      final spec = solveArrangeStack(height: stackHeight, cardCount: 7);
+      for (var i = 1; i < spec.cardCount; i++) {
+        expect(spec.revealTopOf(i) - spec.revealTopOf(i - 1),
+            closeTo(spec.peek, 0.01),
+            reason: 'row $i');
+      }
+    });
+
+    test('always fits the box, because arrange mode does not scroll', () {
+      // A drag that both reorders and scrolls is the conflict that makes these
+      // UIs feel broken, so the rows thin out instead.
+      for (final count in [3, 7, 12, 20]) {
+        final spec = solveArrangeStack(height: stackHeight, cardCount: count);
+        expect(spec.totalHeight, lessThanOrEqualTo(stackHeight + 0.01),
+            reason: '$count cards');
+      }
+    });
+
+    test('keeps rows chunky when there is room', () {
+      final spec = solveArrangeStack(height: stackHeight, cardCount: 5);
+      expect(spec.peek, greaterThan(StackStyle.standard.minPeek));
+    });
+
+    test('a very large deck thins the rows rather than overflowing', () {
+      final spec = solveArrangeStack(height: stackHeight, cardCount: 40);
+      expect(spec.totalHeight, lessThanOrEqualTo(stackHeight + 0.01));
+      expect(spec.peek, greaterThan(0));
+    });
+
+    test('a short deck is centred', () {
+      final spec = solveArrangeStack(height: stackHeight, cardCount: 2);
+      expect(spec.originY, closeTo((stackHeight - spec.totalHeight) / 2, 0.01));
+    });
+
+    test('the first card stays at the front of the deck', () {
+      final spec = solveArrangeStack(height: stackHeight, cardCount: 5);
+      expect(spec.paintOrder.first, 4);
+      expect(spec.paintOrder.last, 0);
+    });
+
+    test('an empty deck does not divide by zero', () {
+      final spec = solveArrangeStack(height: stackHeight, cardCount: 0);
+      expect(spec.totalHeight, 0);
+      expect(spec.indexForY(100), 0);
+    });
+  });
+
+  group('indexForY', () {
+    test('a finger on a row picks that row', () {
+      final spec = solveArrangeStack(height: stackHeight, cardCount: 6);
+      for (var i = 0; i < 6; i++) {
+        final middle = spec.revealTopOf(i) + spec.peek / 2;
+        expect(spec.indexForY(middle), i, reason: 'row $i');
+      }
+    });
+
+    test('is the inverse of the row positions at their boundaries', () {
+      final spec = solveArrangeStack(height: stackHeight, cardCount: 6);
+      for (var i = 0; i < 6; i++) {
+        expect(spec.indexForY(spec.revealTopOf(i) + 0.5), i, reason: 'row $i');
+      }
+    });
+
+    test('a drag beyond either end clamps to a real row', () {
+      final spec = solveArrangeStack(height: stackHeight, cardCount: 6);
+      expect(spec.indexForY(-9999), 0);
+      expect(spec.indexForY(9999), 5);
+    });
+  });
+
   group('cardIndexForKnobPosition', () {
     const track = 340.0;
 

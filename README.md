@@ -27,12 +27,23 @@ rests there anyway. Swiping the stack and tapping the track work too.
 ## Cards
 
 - **Tap** a collapsed card to focus it; tap the focused card to open it.
-- **Hold** a card to edit its **name, colour, icon and position**, or delete it.
-  Reordering lives in that sheet rather than as a drag on the stack, because the
-  stack's vertical drag already means "change focus" and overloading it would
-  make the one gesture that has to stay reliable ambiguous.
+- **Hold** a card to enter **arrange mode**: the cards flatten to uniform rows
+  and wiggle, and you drag them to reorder. Tap a card there to edit its name,
+  colour and icon, or delete it. Done exits.
 - Deleting a card doesn't remove its apps — they stop being filed and reappear
   under all apps.
+
+Arrange mode flattens every card to the same row on purpose: reordering a deck
+where one card is four times the height of its neighbours is guesswork, and
+uniform rows make the landing slot obvious. Nothing else listens for a vertical
+drag while arranging — not the focus swipe, not the knob, not a scroll view — so
+the reorder gesture is unambiguous. That is also why arrange mode never scrolls:
+the rows thin out to fit instead, because a drag that both reorders *and*
+scrolls is the conflict that makes these UIs feel broken.
+
+The dragged card follows your finger rather than snapping between slots, and the
+deck reorders live underneath it, so you see where it will land before you let
+go. All apps can't be dragged and nothing can be dropped behind it.
 - **+** in the top strip adds a card and opens the editor on it.
 - Inside **all apps**, hold an app to file it under a card. An app lives on at
   most one card — two homes would show it twice and make removing it ambiguous.

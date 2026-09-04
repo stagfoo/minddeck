@@ -29,9 +29,10 @@ class CardEditResult {
 /// the real thing at the top and updates it live as you pick — choosing from
 /// swatches alone means guessing how a colour reads behind black text.
 ///
-/// Reordering lives here rather than as a drag on the stack because the stack's
-/// vertical drag already means "change focus", and overloading it would make
-/// the one gesture that has to stay reliable ambiguous.
+/// Reordering is not here: it is a drag on the cards themselves in arrange
+/// mode, which is where a question about position belongs. The sheet still
+/// carries the card's position through untouched so the caller has one result
+/// shape either way.
 Future<CardEditResult?> showCardEditor(
   BuildContext context,
   DeckCard card, {
@@ -69,7 +70,6 @@ class _CardEditorSheet extends StatefulWidget {
 
 class _CardEditorSheetState extends State<_CardEditorSheet> {
   late DeckCard _draft = widget.card;
-  late int _position = widget.position;
   late final TextEditingController _name =
       TextEditingController(text: widget.card.name);
 
@@ -111,10 +111,6 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
               onChanged: (value) =>
                   setState(() => _draft = _draft.copyWith(name: value)),
             ),
-            const SizedBox(height: 18),
-            _label('Position'),
-            const SizedBox(height: 8),
-            _position_(),
             const SizedBox(height: 18),
             _label('Colour'),
             const SizedBox(height: 8),
@@ -182,7 +178,7 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
     if (confirmed != true || !mounted) return;
     Navigator.pop(
       context,
-      CardEditResult(card: widget.card, position: _position, deleted: true),
+      CardEditResult(card: widget.card, position: widget.position, deleted: true),
     );
   }
 
@@ -194,44 +190,8 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
       context,
       CardEditResult(
         card: _draft.copyWith(name: trimmed.isEmpty ? widget.card.name : trimmed),
-        position: _position,
+        position: widget.position,
       ),
-    );
-  }
-
-  void _move(int delta) {
-    setState(() =>
-        _position = (_position + delta).clamp(0, widget.folderCount - 1));
-  }
-
-  /// Front of the deck is position 1, since that is how the stack reads: the
-  /// first card is the one in front.
-  Widget _position_() {
-    final canMoveUp = _position > 0;
-    final canMoveDown = _position < widget.folderCount - 1;
-    return Row(
-      children: [
-        _MoveButton(
-          icon: Icons.keyboard_arrow_up_rounded,
-          label: 'Forward',
-          enabled: canMoveUp,
-          onTap: () => _move(-1),
-        ),
-        const SizedBox(width: 10),
-        _MoveButton(
-          icon: Icons.keyboard_arrow_down_rounded,
-          label: 'Back',
-          enabled: canMoveDown,
-          onTap: () => _move(1),
-        ),
-        const Spacer(),
-        Text(
-          _position == 0
-              ? 'front of the deck'
-              : '${_position + 1} of ${widget.folderCount}',
-          style: const TextStyle(color: DeckColors.textDim, fontSize: 12),
-        ),
-      ],
     );
   }
 
@@ -343,48 +303,6 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
             ),
           ),
       ],
-    );
-  }
-}
-
-
-class _MoveButton extends StatelessWidget {
-  const _MoveButton({
-    required this.icon,
-    required this.label,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: enabled ? 1 : 0.35,
-      child: GestureDetector(
-        onTap: enabled ? onTap : null,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            color: DeckColors.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: DeckColors.surfaceEdge),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18, color: DeckColors.text),
-              const SizedBox(width: 4),
-              Text(label,
-                  style: const TextStyle(color: DeckColors.text, fontSize: 12)),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
