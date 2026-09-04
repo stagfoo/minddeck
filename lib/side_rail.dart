@@ -22,11 +22,16 @@ class SideRail extends StatefulWidget {
     required this.cardCount,
     required this.focusedIndex,
     required this.onFocusChanged,
+    required this.color,
   });
 
   final int cardCount;
   final int focusedIndex;
   final ValueChanged<int> onFocusChanged;
+
+  /// The focused card's colour. The grip wears it, so the rail says which card
+  /// you are on even while your thumb is covering the deck.
+  final Color color;
 
   @override
   State<SideRail> createState() => _SideRailState();
@@ -94,7 +99,9 @@ class _SideRailState extends State<SideRail> {
                   height: knob.height,
                   left: 0,
                   right: 0,
-                  child: Center(child: _Knob(active: _dragging)),
+                  child: Center(
+                    child: _Knob(active: _dragging, color: widget.color),
+                  ),
                 ),
               ],
             ),
@@ -106,29 +113,34 @@ class _SideRailState extends State<SideRail> {
 }
 
 class _Knob extends StatelessWidget {
-  const _Knob({required this.active});
+  const _Knob({required this.active, required this.color});
 
   final bool active;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+      // The colour is animated by the same container that animates the width,
+      // so moving between cards cross-fades the grip rather than snapping it.
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
       width: active ? 34 : 30,
       height: double.infinity,
       decoration: BoxDecoration(
-        color: active ? const Color(0xFFFF6A22) : const Color(0xFF3A3A44),
+        color: color,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: active ? const Color(0xFFFF8A4C) : DeckColors.surfaceEdge,
+          // Every palette colour is chosen to carry black, so a dark rim reads
+          // on all of them; while dragging it lifts to white for the grabbed
+          // state instead of inventing a second hue.
+          color: active
+              ? Colors.white.withValues(alpha: 0.85)
+              : DeckColors.ground.withValues(alpha: 0.55),
+          width: active ? 2 : 1,
         ),
         boxShadow: active
-            ? [
-                BoxShadow(
-                  color: const Color(0xFFFF6A22).withValues(alpha: 0.4),
-                  blurRadius: 14,
-                ),
-              ]
+            ? [BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 16)]
             : null,
       ),
       child: const _Ridges(),

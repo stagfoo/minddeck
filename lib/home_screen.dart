@@ -173,6 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
             cardCount: _deck.length,
             focusedIndex: _focused,
             onFocusChanged: _focus,
+            color: colorOf(_deck[_focused.clamp(0, _deck.length - 1)].colorKey),
           ),
         ],
       ),

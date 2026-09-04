@@ -19,8 +19,9 @@ wrapped grid because a card is wide and short, and because it keeps the vertical
 gesture free for the stack — the one that has to stay reliable.
 
 The phone has no scroll wheel, so the deck gets a **pull knob** down the right
-edge instead — a ridged grip on a recessed track, with a haptic tick as each
-card takes focus. The **whole right band** is the grab area, top to bottom: a
+edge instead — a ridged grip on a recessed track, wearing the focused card's
+colour so the rail says which card you are on even while your thumb covers the
+deck, with a haptic tick as each card takes focus. The **whole right band** is the grab area, top to bottom: a
 thin track would be a hairline target on a screen this small, and the thumb
 rests there anyway. Swiping the stack and tapping the track work too.
 
