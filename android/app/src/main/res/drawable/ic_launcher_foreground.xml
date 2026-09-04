@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Icons "style": a fanned stack of cards, which is what the launcher
+     is. Path taken verbatim from google/material-design-icons.
+
+     An adaptive icon's canvas is 108x108 with only the middle 72x72 guaranteed
+     visible. The glyph's own bounding box is not centred in its 24-unit viewbox
+     and is not square — measured at x=1.295 y=2.75 w=20.885 h=19 — so centring
+     it by eye leaves it sitting low and left. These numbers place that box
+     dead centre at 60.6 x 55.1 units, inside the safe zone whatever shape the
+     launcher's mask crops to. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2.9"
+        android:scaleY="2.9"
+        android:translateX="19.96"
+        android:translateY="18.48">
+        <path
+            android:fillColor="#0A0A0C"
+            android:pathData="M2.53,19.65l1.34,0.56v-9.03l-2.43,5.86c-0.41,1.02 0.08,2.19 1.09,2.61zM22.03,15.95L17.07,3.98c-0.31,-0.75 -1.04,-1.21 -1.81,-1.23 -0.26,0 -0.53,0.04 -0.79,0.15L7.1,5.95c-0.75,0.31 -1.21,1.03 -1.23,1.8 -0.01,0.27 0.04,0.54 0.15,0.8l4.96,11.97c0.31,0.76 1.05,1.22 1.83,1.23 0.26,0 0.52,-0.05 0.77,-0.15l7.36,-3.05c1.02,-0.42 1.51,-1.59 1.09,-2.6zM7.88,8.75c-0.55,0 -1,-0.45 -1,-1s0.45,-1 1,-1 1,0.45 1,1 -0.45,1 -1,1zM5.88,19.75c0,1.1 0.9,2 2,2h1.45l-3.45,-8.34v6.34z" />
+    </group>
+</vector>

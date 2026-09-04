@@ -207,6 +207,20 @@ remove the old Obtainium entry and add this one, set Rolidecks as the home app,
 and uninstall MindDeck once you are happy. The deck does not carry over — an
 applicationId is an app's identity, and a different one gets its own storage.
 
+## The launcher icon
+
+Material Icons' `style` — a fanned stack of cards, which is what this is — as an
+adaptive icon: black glyph on the app's accent, the same black-on-saturated
+arrangement the cards use. `minSdk` is 26, so every device that can run this
+supports adaptive icons and there are no bitmap mipmaps to keep in step; the
+same vector doubles as the `monochrome` layer for Android 13+ themed icons.
+
+The glyph's own bounding box is neither centred in its 24-unit viewbox nor
+square (x=1.295, y=2.75, 20.885 × 19), so centring it by eye leaves it low and
+left. The scale and offset in `ic_launcher_foreground.xml` are derived from that
+measured box, and place it dead centre at 60.6 × 55.1 units — inside the 72-unit
+safe zone whatever shape a launcher's mask crops to.
+
 ## Building
 
 ```sh
