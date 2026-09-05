@@ -69,16 +69,24 @@ class LauncherBridge {
 
   bool hasIcon(String key) => _iconCache.containsKey(key);
 
-  /// The icon for [app], whichever kind it is. Cached and de-duplicated on the
-  /// item's id, so a shortcut and its host app do not share one entry.
+  /// The one cache key for [app].
+  ///
+  /// An app is keyed by package — every launcher entry of a package shares its
+  /// icon — and a shortcut by its full id, since it has its own. There is
+  /// exactly one key per item on purpose: writing the icon under one key and
+  /// reading it under another cached a null against the read key and every app
+  /// icon fell back to the placeholder for good.
+  static String iconKeyFor(LaunchableApp app) =>
+      app.isShortcut ? app.id : app.packageName;
+
+  Uint8List? cachedIconFor(LaunchableApp app) => _iconCache[iconKeyFor(app)];
+
+  bool hasIconFor(LaunchableApp app) =>
+      _iconCache.containsKey(iconKeyFor(app));
+
+  /// The icon for [app], whichever kind it is.
   Future<Uint8List?> iconFor(LaunchableApp app, {int size = 144}) {
-    if (!app.isShortcut) {
-      // Keyed by id as well as package, so a synchronous cache hit works the
-      // same for both kinds and the widget only has to ask once.
-      final byPackage = appIcon(app.packageName, size: size);
-      _iconCache[app.id] = _iconCache[app.packageName];
-      return byPackage;
-    }
+    if (!app.isShortcut) return appIcon(app.packageName, size: size);
 
     final key = app.id;
     if (_iconCache.containsKey(key)) {

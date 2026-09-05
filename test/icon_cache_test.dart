@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rolidecks/launcher_bridge.dart';
+import 'package:rolidecks/models.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -16,7 +17,7 @@ void main() {
     pending = [];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
-      if (call.method != 'appIcon') return null;
+      if (call.method != 'appIcon' && call.method != 'shortcutIcon') return null;
       requested.add(call.arguments['packageName'] as String);
       final completer = Completer<Uint8List?>();
       pending.add(completer);
@@ -27,8 +28,12 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
-    for (final package in ['com.a', 'com.b']) {
-      LauncherBridge.instance.forgetIcon(package);
+    for (final key in [
+      'com.a',
+      'com.b',
+      'shortcut:com.a/one',
+    ]) {
+      LauncherBridge.instance.forgetIcon(key);
     }
   });
 
@@ -81,6 +86,55 @@ void main() {
 
     expect(LauncherBridge.instance.hasIcon('com.a'), isTrue);
     expect(LauncherBridge.instance.cachedIcon('com.a'), [9]);
+  });
+
+  group('one key per item', () {
+    const app = LaunchableApp(
+      packageName: 'com.a',
+      activityName: 'com.a.Main',
+      label: 'A',
+    );
+    final shortcut = LaunchableApp.shortcut(
+      packageName: 'com.a',
+      id: 'one',
+      label: 'One',
+    );
+
+    test('an app is keyed by package, a shortcut by its full id', () {
+      // Writing under one key and reading under another is what cached a null
+      // against the read key and left every app icon on the placeholder.
+      expect(LauncherBridge.iconKeyFor(app), 'com.a');
+      expect(LauncherBridge.iconKeyFor(shortcut), 'shortcut:com.a/one');
+    });
+
+    test('a fetch in flight does not read back as a cached nothing', () async {
+      expect(LauncherBridge.instance.hasIconFor(app), isFalse);
+
+      final pendingIcon = LauncherBridge.instance.iconFor(app);
+      // Mid-flight: still not cached, so the widget keeps waiting on the future
+      // instead of painting an empty result forever.
+      expect(LauncherBridge.instance.hasIconFor(app), isFalse);
+      expect(LauncherBridge.instance.cachedIconFor(app), isNull);
+
+      pending.single.complete(Uint8List.fromList([4, 2]));
+      await pendingIcon;
+
+      expect(LauncherBridge.instance.hasIconFor(app), isTrue);
+      expect(LauncherBridge.instance.cachedIconFor(app), [4, 2]);
+    });
+
+    test('a shortcut and its host app do not share an icon', () async {
+      final appIcon = LauncherBridge.instance.iconFor(app);
+      final shortcutIcon = LauncherBridge.instance.iconFor(shortcut);
+      expect(requested, hasLength(2));
+
+      pending[0].complete(Uint8List.fromList([1]));
+      pending[1].complete(Uint8List.fromList([2]));
+      await Future.wait([appIcon, shortcutIcon]);
+
+      expect(LauncherBridge.instance.cachedIconFor(app), [1]);
+      expect(LauncherBridge.instance.cachedIconFor(shortcut), [2]);
+    });
   });
 
   test('a failed fetch does not wedge the package forever', () async {

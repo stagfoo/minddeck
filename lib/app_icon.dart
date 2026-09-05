@@ -33,8 +33,8 @@ class AppIconImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cached = LauncherBridge.instance.cachedIcon(app.id);
-    if (LauncherBridge.instance.hasIcon(app.id)) {
+    final cached = LauncherBridge.instance.cachedIconFor(app);
+    if (LauncherBridge.instance.hasIconFor(app)) {
       return _paint(context, cached);
     }
     return FutureBuilder<Uint8List?>(
