@@ -60,6 +60,27 @@ git commit -m "Release $next_version"
 # this the whole build runs and then fails with "target_commitish is invalid".
 git push origin HEAD
 
+# The APK must have been built from the bumped pubspec, not from whatever was
+# lying in build/ beforehand. Releasing a stale artifact ships the previous
+# version under a new tag: Android sees an unchanged versionCode and declines
+# the install, and the release quietly contains none of its own changes.
+if command -v aapt2 >/dev/null 2>&1; then
+  aapt2_bin=aapt2
+else
+  aapt2_bin=$(ls -d "${ANDROID_HOME:-$HOME/development/android-sdk}"/build-tools/*/aapt2 2>/dev/null | tail -1 || true)
+fi
+if [ -n "${aapt2_bin:-}" ] && [ -x "${aapt2_bin}" ]; then
+  built=$("$aapt2_bin" dump badging "$apk_path" | head -1 | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+  if [ "$built" != "$next_version" ]; then
+    echo "!! APK says version $built but the release is $next_version." >&2
+    echo "!! That is a stale build; it would ship the previous version." >&2
+    exit 1
+  fi
+  echo "==> APK verified as $built"
+else
+  echo "!! aapt2 not found; cannot verify the APK matches $next_version." >&2
+fi
+
 gh release create "$tag" "$apk_path" \
   --title "$app_name $next_version" \
   --notes "$(git log -1 --pretty=%s)" \
