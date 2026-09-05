@@ -9,12 +9,16 @@ void main() {
       expect(materialIcons.length, greaterThan(2000));
     });
 
-    test('every popular key is a real icon', () {
-      // The shortlist is hand-written, so a typo in it would show a folder
-      // where a camera was meant.
-      for (final key in popularIconKeys) {
+    test('every hand-written key is a real icon', () {
+      // These lists are typed out, so a typo would show a folder where a
+      // camera was meant.
+      for (final key in [...starterIconKeys, ...commonIconKeys]) {
         expect(materialIcons.containsKey(key), isTrue, reason: key);
       }
+    });
+
+    test('the common list has no duplicates', () {
+      expect(commonIconKeys.toSet(), hasLength(commonIconKeys.length));
     });
 
     test('keys carry no rounded suffix', () {
@@ -51,8 +55,17 @@ void main() {
 
   group('searchIcons', () {
     test('an empty query offers the common ones, not all 2,200', () {
-      expect(searchIcons(''), popularIconKeys);
-      expect(searchIcons('   '), popularIconKeys);
+      expect(searchIcons(''), commonIconKeys);
+      expect(searchIcons('   '), commonIconKeys);
+    });
+
+    test('the picker opens on more than the editor shelf shows', () {
+      // Five on the shelf, a few dozen when the picker opens, everything when
+      // you type — each step only when the last one was not enough.
+      expect(starterIconKeys, hasLength(5));
+      expect(commonIconKeys.length, greaterThan(starterIconKeys.length));
+      expect(materialIcons.length, greaterThan(commonIconKeys.length));
+      expect(commonIconKeys.take(5), starterIconKeys);
     });
 
     test('matches anywhere in the name', () {

@@ -43,6 +43,25 @@ void main() {
     });
   });
 
+  group('the shelf', () {
+    test('shows the five the starter deck arrives with', () {
+      expect(starterColorKeys, hasLength(5));
+      expect(starterColorKeys,
+          [for (final entry in cardPalette.take(5)) entry.key]);
+    });
+
+    test('the other palette colours still resolve, they are just not shown', () {
+      // The all-apps card is butter, and decks already saved name colours from
+      // the whole palette — dropping them would repaint those cards.
+      for (final entry in cardPalette) {
+        expect(isKnownColorKey(entry.key), isTrue, reason: entry.key);
+        expect(colorForKey(entry.key).value, entry.value, reason: entry.key);
+      }
+      expect(starterColorKeys.contains('butter'), isFalse);
+      expect(colorForKey('butter').value, isNot(cardPalette.first.value));
+    });
+  });
+
   group('the foreground follows the colour', () {
     test('black on every palette colour, which is why they were chosen', () {
       for (final entry in cardPalette) {

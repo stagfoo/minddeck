@@ -24,6 +24,10 @@ class CardColor {
 /// Saturated flat colours that all carry black text legibly — the rabbitOS
 /// stack look. Ordered so consecutive cards land on visibly different hues
 /// when a deck is seeded.
+///
+/// All twelve remain nameable and resolvable, and the colour picker offers
+/// them; only the first five are on the editor's shelf. See
+/// [starterColorKeys].
 const List<CardColor> cardPalette = [
   CardColor('magenta', 'Magenta', 0xFFFF2BB5),
   CardColor('cyan', 'Cyan', 0xFF3FE3F0),
@@ -39,22 +43,28 @@ const List<CardColor> cardPalette = [
   CardColor('butter', 'Butter', 0xFFFFD93D),
 ];
 
-/// The icons offered up front in the card editor, before searching.
+/// The five icons the starter deck arrives with.
 ///
-/// Every Material icon is available — see [materialIcons], all 2,200 of them —
-/// but a wall of two thousand is not a choice, it is a search problem. These
-/// are the ones a folder of apps is usually about, so the common case is a tap
-/// rather than a query.
-const List<String> popularIconKeys = [
-  'grid_view',
+/// This is the whole shelf in the card editor. Everything else is a tap away
+/// behind the picker, and whatever gets picked is remembered — so the grid
+/// grows into what this phone actually uses instead of guessing up front.
+const List<String> starterIconKeys = [
   'star',
-  'favorite',
   'music_note',
+  'chat_bubble',
+  'sports_esports',
+  'build',
+];
+
+/// The wider set the icon picker opens on, before anything is typed. A middle
+/// step between the five and searching all 2,200.
+const List<String> commonIconKeys = [
+  ...starterIconKeys,
+  'grid_view',
+  'favorite',
   'photo_camera',
   'image',
   'movie',
-  'sports_esports',
-  'chat_bubble',
   'call',
   'mail',
   'public',
@@ -70,7 +80,6 @@ const List<String> popularIconKeys = [
   'restaurant',
   'directions_car',
   'flight',
-  'build',
   'settings',
   'code',
   'terminal',
@@ -85,6 +94,11 @@ const List<String> popularIconKeys = [
 ];
 
 const String fallbackIconKey = 'folder';
+
+/// The five colours the starter deck arrives with — the editor's shelf, in the
+/// same way [starterIconKeys] is.
+List<String> get starterColorKeys =>
+    [for (final entry in cardPalette.take(5)) entry.key];
 
 /// Keys written by the first builds, which used names of their own invention
 /// rather than Material's. Kept so a card saved then keeps its icon.
@@ -150,7 +164,7 @@ String normaliseIconKey(String? key) {
 /// Icons whose name contains [query], for the picker's search.
 List<String> searchIcons(String query) {
   final needle = query.trim().toLowerCase().replaceAll(' ', '_');
-  if (needle.isEmpty) return popularIconKeys;
+  if (needle.isEmpty) return commonIconKeys;
   return [
     for (final key in materialIcons.keys)
       if (key.contains(needle)) key,

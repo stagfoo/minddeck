@@ -51,7 +51,7 @@ void main() {
 
     test('a searched icon survives too', () async {
       final recents = StyleRecents();
-      await recents.addIcon('rocket_launch', presets: popularIconKeys);
+      await recents.addIcon('rocket_launch', presets: starterIconKeys);
       expect(await StyleRecents().icons(), ['rocket_launch']);
     });
 
@@ -65,8 +65,16 @@ void main() {
 
     test('a preset is not remembered, since it is already shown', () async {
       final recents = StyleRecents();
-      await recents.addIcon('folder', presets: popularIconKeys);
+      await recents.addIcon(starterIconKeys.first, presets: starterIconKeys);
       expect(await recents.icons(), isEmpty);
+    });
+
+    test('an icon off the shelf is remembered, even a common one', () async {
+      // The shelf is five now, so a folder icon picked from the picker is
+      // worth keeping — it is not one tap away otherwise.
+      final recents = StyleRecents();
+      await recents.addIcon('folder', presets: starterIconKeys);
+      expect(await recents.icons(), ['folder']);
     });
 
     test('re-picking reorders the stored list', () async {

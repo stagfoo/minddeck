@@ -89,11 +89,18 @@ swatches. The picker tile beside them opens any colour at all, and icons work
 the same way: three dozen common ones for a tap, with the whole rounded Material
 set — all 2,200 — behind the search tile.
 
+The shelf in the card editor is just the five colours and five icons the
+starter deck arrives with. Everything else is one tap behind the picker: twelve
+named colours or a few dozen common icons when it opens, then any colour at all
+or all 2,200 icons once you search. Each step only appears when the last was not
+enough.
+
 Both grids remember. A custom colour, or an icon found by searching, is
 appended to the grid it was reached from and kept across restarts — picking one
-is deliberate work, and having to redo it for the next card wastes it. Presets
-are never remembered, since they are already on the shelf, and re-picking
-something moves it up rather than duplicating it. Twelve of each, newest first.
+is deliberate work, and having to redo it for the next card wastes it. Anything
+already on the shelf is not remembered, and re-picking something moves it up
+rather than duplicating it. Twelve of each, newest first — so the shelf grows
+into what this phone actually uses rather than guessing up front.
 
 Both grids open their full picker through the same rainbow tile, so the two read
 as the same kind of door rather than as one more swatch.

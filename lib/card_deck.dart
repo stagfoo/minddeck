@@ -136,7 +136,7 @@ class CardDeck {
         id: 'card-${DateTime.now().microsecondsSinceEpoch}-$index',
         name: name,
         colorKey: paletteAt(index).key,
-        iconKey: popularIconKeys[(index + 1) % popularIconKeys.length],
+        iconKey: starterIconKeys[(index + 1) % starterIconKeys.length],
       ),
     ]);
   }
@@ -233,7 +233,9 @@ class CardDeck {
       ]);
 
   static const _seedNames = ['daily', 'media', 'talk', 'play', 'tools'];
-  static const _seedIcons = ['star', 'music', 'chat', 'game', 'tools'];
+  // Material names, not the short ones the earliest builds invented, so a
+  // seeded card's icon matches the shelf it is shown next to.
+  static const _seedIcons = starterIconKeys;
 
   List<Map<String, dynamic>> toJson() =>
       [for (final card in folders) card.toJson()];

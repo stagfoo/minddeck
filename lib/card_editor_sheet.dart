@@ -272,7 +272,7 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
     if (!isCustomColorKey(picked)) return;
     final updated = await _recents.addColor(
       picked,
-      presets: [for (final entry in cardPalette) entry.key],
+      presets: starterColorKeys,
     );
     if (mounted) setState(() => _recentColors = updated);
   }
@@ -312,7 +312,7 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
                   : null,
             ),
           ),
-        for (final color in cardPalette)
+        for (final color in cardPalette.take(starterColorKeys.length))
           GestureDetector(
             onTap: () =>
                 setState(() => _draft = _draft.copyWith(colorKey: color.key)),
@@ -348,7 +348,7 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
     );
     if (picked == null) return;
     setState(() => _draft = _draft.copyWith(iconKey: picked));
-    final updated = await _recents.addIcon(picked, presets: popularIconKeys);
+    final updated = await _recents.addIcon(picked, presets: starterIconKeys);
     if (mounted) setState(() => _recentIcons = updated);
   }
 
@@ -363,9 +363,9 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
         _PickerTile(
           icon: Icons.search_rounded,
           onTap: _pickIcon,
-          selected: !popularIconKeys.contains(_draft.iconKey),
+          selected: !starterIconKeys.contains(_draft.iconKey),
         ),
-        for (final key in [..._recentIcons, ...popularIconKeys])
+        for (final key in [..._recentIcons, ...starterIconKeys])
           GestureDetector(
             onTap: () => setState(() => _draft = _draft.copyWith(iconKey: key)),
             child: AnimatedContainer(
