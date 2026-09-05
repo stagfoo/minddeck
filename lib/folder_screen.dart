@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'app_icon.dart';
 import 'app_menu_sheet.dart';
 import 'app_tile.dart';
 import 'card_deck.dart';
@@ -37,7 +36,10 @@ class _FolderScreenState extends State<FolderScreen> {
   late CardDeck _deck = widget.deck;
   String _query = '';
   _Tab _tab = _Tab.apps;
-  List<LaunchableApp> _makers = const [];
+
+  /// Null until asked. Android only sends shortcuts to the home app, so an
+  /// empty Shortcuts tab means something different depending on this.
+  bool? _isHomeApp;
 
   /// The card's apps, resolved once rather than on every build. For the
   /// all-apps card that resolve sorts every app on the phone, and rebuilding
@@ -53,14 +55,13 @@ class _FolderScreenState extends State<FolderScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.card.isAllApps) _loadMakers();
+    if (widget.card.isAllApps) _loadShortcutState();
   }
 
-  Future<void> _loadMakers() async {
-    final makers = await LauncherBridge.instance.listShortcutMakers();
+  Future<void> _loadShortcutState() async {
+    final state = await LauncherBridge.instance.shortcutDiagnostics();
     if (!mounted) return;
-    makers.sort(compareByLabel);
-    setState(() => _makers = makers);
+    setState(() => _isHomeApp = state['isDefaultLauncher'] == true);
   }
 
   @override
@@ -105,7 +106,6 @@ class _FolderScreenState extends State<FolderScreen> {
             _header(card, color),
             if (card.isAllApps) _tabs(color),
             if (card.isAllApps) _search(),
-            if (showingShortcuts) _makerList(color),
             Expanded(
               child: apps.isEmpty
                   ? _empty(card)
@@ -230,16 +230,46 @@ class _FolderScreenState extends State<FolderScreen> {
 
   Widget _empty(DeckCard card) {
     if (card.isAllApps && _tab == _Tab.shortcuts) {
+      if (_query.trim().isNotEmpty) {
+        return Center(
+          child: Text('Nothing matches',
+              style: deckText(size: 13, color: DeckColors.textDim)),
+        );
+      }
+      // An empty tab means one of two very different things, and only one of
+      // them is worth doing anything about — so it says which.
+      final notHome = _isHomeApp == false;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(28),
-          child: Text(
-            _query.trim().isEmpty
-                ? 'No shortcuts yet.\nMake one below, or add one from another '
-                    'app.'
-                : 'Nothing matches',
-            textAlign: TextAlign.center,
-            style: deckText(size: 13, color: DeckColors.textDim),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                notHome
+                    ? 'Rolidecks is not the home app, so Android will not send '
+                        'it shortcuts at all.'
+                    : 'No shortcuts yet.\n\nUse "add to home screen" in any app '
+                        'and it will appear here.',
+                textAlign: TextAlign.center,
+                style: deckText(size: 13, color: DeckColors.textDim),
+              ),
+              if (notHome) ...[
+                const SizedBox(height: 14),
+                FilledButton(
+                  onPressed: LauncherBridge.instance.openHomeSettings,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorOf(card.colorKey),
+                    foregroundColor: onCardForKey(card.colorKey),
+                  ),
+                  child: Text('Set as home app',
+                      style: deckText(
+                          size: 13,
+                          weight: 600,
+                          color: onCardForKey(card.colorKey))),
+                ),
+              ],
+            ],
           ),
         ),
       );
@@ -254,48 +284,6 @@ class _FolderScreenState extends State<FolderScreen> {
           textAlign: TextAlign.center,
           style: const TextStyle(color: DeckColors.textDim, fontSize: 13),
         ),
-      ),
-    );
-  }
-
-  /// The apps that will build a shortcut on request. Listed rather than hidden
-  /// behind a menu, because this is the only route many apps offer and there is
-  /// no way to guess which ones they are.
-  Widget _makerList(Color color) {
-    if (_makers.isEmpty) return const SizedBox.shrink();
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 190),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: DeckColors.surfaceEdge)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-            child: Text('Make a shortcut',
-                style: deckText(size: 11, color: DeckColors.textDim)),
-          ),
-          Flexible(
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount: _makers.length,
-              itemBuilder: (context, index) {
-                final maker = _makers[index];
-                return ListTile(
-                  dense: true,
-                  leading: AppIconImage(app: maker, size: 26),
-                  title: Text(maker.label, style: deckText(size: 13)),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await LauncherBridge.instance.createShortcut(maker);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }

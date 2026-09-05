@@ -53,7 +53,11 @@ flutter analyze
 flutter test
 flutter build apk --release --target-platform android-arm64 --split-per-abi
 
-git add pubspec.yaml
+# Everything, not just the pubspec. Committing the version alone left the
+# source of two releases only in the working tree: the APK was built from it, so
+# what shipped and what the repo said were different things, and a stray git
+# checkout could destroy work that had already gone out.
+git add -A
 git commit -m "Release $next_version"
 
 # gh release create --target takes a commit the remote already has; without

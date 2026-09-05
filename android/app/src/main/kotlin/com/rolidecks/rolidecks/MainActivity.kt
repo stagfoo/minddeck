@@ -2,11 +2,13 @@ package com.rolidecks.rolidecks
 
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -26,6 +28,9 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONArray
+import org.json.JSONObject
+import android.util.Base64
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 
@@ -48,6 +53,22 @@ class MainActivity : FlutterActivity() {
     private val main = Handler(Looper.getMainLooper())
 
     private val requestCreateShortcut = 4011
+
+    /**
+     * Results are written here before they are announced.
+     *
+     * This activity is stateNotNeeded and excluded from recents, so Android is
+     * free to destroy it while another app's shortcut picker is on screen. The
+     * result then lands on a freshly created activity whose Dart side is not
+     * listening yet, and a message sent straight down the channel is dropped
+     * with nothing to show for it. Writing it down first means the shortcut
+     * survives that and is collected when Dart next asks.
+     */
+    private val shortcutPrefs: SharedPreferences
+        get() = getSharedPreferences("rolidecks.shortcuts", Context.MODE_PRIVATE)
+
+    private val pendingKey = "pending"
+    private val outcomeKey = "lastOutcome"
     private var channel: MethodChannel? = null
     private var packageEvents: EventChannel.EventSink? = null
     private var packageReceiver: BroadcastReceiver? = null
@@ -117,18 +138,14 @@ class MainActivity : FlutterActivity() {
             null
         }
 
-        main.post {
-            channel?.invokeMethod(
-                "shortcutPinned",
-                mapOf(
-                    "packageName" to shortcut.getPackage(),
-                    "shortcutId" to shortcut.id,
-                    "label" to (shortcut.longLabel ?: shortcut.shortLabel ?: shortcut.id)
-                        .toString(),
-                    "icon" to icon
-                )
-            )
-        }
+        noteOutcome("pinned ${shortcut.id}")
+        recordShortcut(
+            label = (shortcut.longLabel ?: shortcut.shortLabel ?: shortcut.id).toString(),
+            packageName = shortcut.getPackage(),
+            shortcutId = shortcut.id,
+            intentUri = null,
+            icon = icon
+        )
     }
 
     /**
@@ -191,6 +208,7 @@ class MainActivity : FlutterActivity() {
             "isDefaultLauncher" -> result.success(isDefaultLauncher())
             "screenMetrics" -> result.success(screenMetrics())
             "shortcutDiagnostics" -> onWorker(result) { shortcutDiagnostics() }
+            "takePendingShortcuts" -> result.success(takePendingShortcuts())
             "listShortcutMakers" -> onWorker(result) { listShortcutMakers() }
             "createShortcut" -> {
                 createShortcut(
@@ -292,11 +310,80 @@ class MainActivity : FlutterActivity() {
     /// read. This answers that without a cable.
     private fun shortcutDiagnostics(): Map<String, Any> {
         val host = launcherApps.hasShortcutHostPermission()
+        // The exact flag every app checks before offering "add to home
+        // screen". Chrome and DuckDuckGo both consult it and quietly do
+        // something else when it is false, so if this is false the problem is
+        // upstream of anything this launcher does with the request.
+        val pinSupported = try {
+            (getSystemService(Context.SHORTCUT_SERVICE) as ShortcutManager)
+                .isRequestPinShortcutSupported
+        } catch (e: Exception) {
+            false
+        }
+
         return mapOf(
+            "isRequestPinShortcutSupported" to pinSupported,
             "isShortcutHost" to host,
             "pinnedCount" to if (host) listShortcuts().size else -1,
-            "isDefaultLauncher" to isDefaultLauncher()
+            "isDefaultLauncher" to isDefaultLauncher(),
+            "makerCount" to listShortcutMakers().size,
+            // What happened the last time a shortcut was attempted, kept so a
+            // failure can be read off the device rather than guessed at.
+            "lastOutcome" to (shortcutPrefs.getString(outcomeKey, "none") ?: "none")
         )
+    }
+
+    private fun noteOutcome(outcome: String) {
+        shortcutPrefs.edit().putString(outcomeKey, outcome).apply()
+    }
+
+    /** Hands over everything recorded since the last ask, and forgets it. */
+    private fun takePendingShortcuts(): List<Map<String, Any?>> {
+        val raw = shortcutPrefs.getString(pendingKey, null) ?: return emptyList()
+        shortcutPrefs.edit().remove(pendingKey).apply()
+        return try {
+            val array = JSONArray(raw)
+            (0 until array.length()).map { index ->
+                val item = array.getJSONObject(index)
+                mapOf(
+                    "packageName" to item.optString("packageName"),
+                    "shortcutId" to item.optString("shortcutId").ifEmpty { null },
+                    "intentUri" to item.optString("intentUri").ifEmpty { null },
+                    "label" to item.optString("label"),
+                    "icon" to item.optString("icon").ifEmpty { null }
+                        ?.let { Base64.decode(it, Base64.NO_WRAP) }
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun recordShortcut(
+        label: String,
+        packageName: String?,
+        shortcutId: String?,
+        intentUri: String?,
+        icon: ByteArray?,
+    ) {
+        val existing = shortcutPrefs.getString(pendingKey, null)
+        val array = try {
+            if (existing == null) JSONArray() else JSONArray(existing)
+        } catch (e: Exception) {
+            JSONArray()
+        }
+        array.put(
+            JSONObject()
+                .put("label", label)
+                .put("packageName", packageName ?: "")
+                .put("shortcutId", shortcutId ?: "")
+                .put("intentUri", intentUri ?: "")
+                .put("icon", icon?.let { Base64.encodeToString(it, Base64.NO_WRAP) } ?: "")
+        )
+        shortcutPrefs.edit().putString(pendingKey, array.toString()).apply()
+        // Announce it too, for when the activity did survive — the Dart side
+        // ignores a duplicate, since a shortcut is identified by what it opens.
+        main.post { channel?.invokeMethod("shortcutsChanged", null) }
     }
 
     /**
@@ -326,6 +413,7 @@ class MainActivity : FlutterActivity() {
         try {
             startActivityForResult(intent, requestCreateShortcut)
         } catch (e: Exception) {
+            noteOutcome("could not open that app's shortcut screen")
             main.post { channel?.invokeMethod("shortcutFailed", null) }
         }
     }
@@ -333,7 +421,9 @@ class MainActivity : FlutterActivity() {
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != requestCreateShortcut || resultCode != RESULT_OK || data == null) {
+        if (requestCode != requestCreateShortcut) return
+        if (resultCode != RESULT_OK || data == null) {
+            noteOutcome("picker returned resultCode=$resultCode, data=${data != null}")
             return
         }
 
@@ -356,43 +446,41 @@ class MainActivity : FlutterActivity() {
                 } catch (e: Exception) {
                     null
                 }
-                main.post {
-                    channel?.invokeMethod(
-                        "shortcutPinned",
-                        mapOf(
-                            "packageName" to shortcut.getPackage(),
-                            "shortcutId" to shortcut.id,
-                            "label" to (shortcut.longLabel ?: shortcut.shortLabel
-                                ?: shortcut.id).toString(),
-                            "icon" to icon
-                        )
-                    )
-                }
+                noteOutcome("created via pin request")
+                recordShortcut(
+                    label = (shortcut.longLabel ?: shortcut.shortLabel
+                        ?: shortcut.id).toString(),
+                    packageName = shortcut.getPackage(),
+                    shortcutId = shortcut.id,
+                    intentUri = null,
+                    icon = icon
+                )
                 return
             }
         }
 
         // Otherwise the old shape: an intent, a name and a bitmap. The system
         // does not remember these, so they are handed to Dart to keep.
-        val shortcutIntent =
-            data.getParcelableExtra<Intent>(Intent.EXTRA_SHORTCUT_INTENT) ?: return
+        val shortcutIntent = data.getParcelableExtra<Intent>(Intent.EXTRA_SHORTCUT_INTENT)
+        if (shortcutIntent == null) {
+            noteOutcome("result had neither a pin request nor an intent")
+            return
+        }
         val label = data.getStringExtra(Intent.EXTRA_SHORTCUT_NAME) ?: "Shortcut"
         val icon = data.getParcelableExtra<Bitmap>(Intent.EXTRA_SHORTCUT_ICON)
 
-        main.post {
-            channel?.invokeMethod(
-                "legacyShortcutCreated",
-                mapOf(
-                    "label" to label,
-                    "uri" to shortcutIntent.toUri(Intent.URI_INTENT_SCHEME),
-                    "icon" to icon?.let {
-                        val stream = ByteArrayOutputStream()
-                        it.compress(Bitmap.CompressFormat.PNG, 100, stream)
-                        stream.toByteArray()
-                    }
-                )
-            )
-        }
+        noteOutcome("created via intent extras")
+        recordShortcut(
+            label = label,
+            packageName = null,
+            shortcutId = null,
+            intentUri = shortcutIntent.toUri(Intent.URI_INTENT_SCHEME),
+            icon = icon?.let {
+                val stream = ByteArrayOutputStream()
+                it.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                stream.toByteArray()
+            }
+        )
     }
 
     /** Launches a shortcut the system does not know about, stored as a URI. */

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'card_deck.dart';
@@ -9,6 +8,7 @@ import 'app_menu_sheet.dart';
 import 'deck_card_view.dart';
 import 'deck_actions.dart';
 import 'deck_store.dart';
+import 'diagnostics_screen.dart';
 import 'edit_deck_screen.dart';
 import 'folder_screen.dart';
 import 'launcher_bridge.dart';
@@ -64,9 +64,7 @@ class _HomeScreenState extends State<HomeScreen>
         Navigator.of(context).popUntil((route) => route.isFirst);
         setState(() => _focused = 0);
       },
-      onShortcutsChanged: _refreshApps,
-      onShortcutPinned: _storePinnedShortcut,
-      onLegacyShortcutCreated: _storeLegacyShortcut,
+      onShortcutsChanged: _resumeRefresh,
       onShortcutFailed: () => _toast('That app could not make a shortcut'),
     );
   }
@@ -85,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen>
   /// actually moved, so paying it on every resume costs nothing visible.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshApps();
+    if (state == AppLifecycleState.resumed) _resumeRefresh();
   }
 
   Future<void> _openEditDeck() async {
@@ -113,6 +111,9 @@ class _HomeScreenState extends State<HomeScreen>
       await _store.save(loaded);
     }
     final deck = loaded;
+    // Before the first list is built, so a shortcut made just before the
+    // launcher was killed is already in it.
+    await _collectPendingShortcuts();
     final cached = await _appCache.load();
 
     if (!mounted) return;
@@ -160,6 +161,34 @@ class _HomeScreenState extends State<HomeScreen>
 
   /// Everything launchable: apps, shortcuts the system remembers, and the
   /// older kind only this launcher remembers.
+  /// Picks up anything the Android side recorded while the launcher was away.
+  ///
+  /// Results are written down there before they are announced, because this
+  /// activity can be destroyed while another app's confirm screen is up — a
+  /// message sent straight down the channel then arrives with nobody listening.
+  Future<int> _collectPendingShortcuts() async {
+    final pending = await LauncherBridge.instance.takePendingShortcuts();
+    var added = 0;
+    for (final record in pending) {
+      final app = record.toApp();
+      if (app == null) continue;
+      await _savedShortcuts.add(StoredShortcut(app: app, icon: record.icon));
+      added++;
+    }
+    return added;
+  }
+
+  /// Coming back is when a shortcut made in another app is collected.
+  Future<void> _resumeRefresh() async {
+    final added = await _collectPendingShortcuts();
+    await _refreshApps();
+    if (added > 0) {
+      _toast(added == 1
+          ? 'Shortcut added — find it under all apps'
+          : '$added shortcuts added — find them under all apps');
+    }
+  }
+
   Future<List<LaunchableApp>> _everything() async {
     final results = await Future.wait([
       LauncherBridge.instance.listEverything(),
@@ -181,45 +210,6 @@ class _HomeScreenState extends State<HomeScreen>
       merged[entry.app.id] = entry.app;
     }
     return merged.values.toList();
-  }
-
-  Future<void> _storePinnedShortcut(
-    String packageName,
-    String shortcutId,
-    String label,
-    Uint8List? icon,
-  ) async {
-    await _savedShortcuts.add(
-      StoredShortcut(
-        app: LaunchableApp.shortcut(
-          packageName: packageName,
-          id: shortcutId,
-          label: label,
-        ),
-        icon: icon,
-      ),
-    );
-    await _refreshApps();
-    _toast('Added $label — file it on a card');
-  }
-
-  Future<void> _storeLegacyShortcut(
-    String label,
-    String uri,
-    Uint8List? icon,
-  ) async {
-    if (uri.isEmpty) {
-      _toast('That shortcut had nothing to open');
-      return;
-    }
-    await _savedShortcuts.add(
-      StoredShortcut(
-        app: LaunchableApp.legacyShortcut(uri: uri, label: label),
-        icon: icon,
-      ),
-    );
-    await _refreshApps();
-    _toast('Added $label — file it on a card');
   }
 
   void _toast(String message) {
@@ -486,25 +476,12 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Future<void> _showMetrics() async {
-    final metrics = _metrics;
-    final messenger = ScaffoldMessenger.of(context);
-    final shortcuts = await LauncherBridge.instance.shortcutDiagnostics();
-    if (!mounted) return;
-
-    final host = shortcuts['isShortcutHost'] == true;
-    final pinned = shortcuts['pinnedCount'];
-    messenger.showSnackBar(
-      SnackBar(
-        backgroundColor: DeckColors.surface,
-        duration: const Duration(seconds: 6),
-        content: Text(
-          '${metrics ?? 'metrics pending'}\n'
-          'home app: ${shortcuts['isDefaultLauncher'] == true ? 'yes' : 'no'} · '
-          'can read shortcuts: ${host ? 'yes' : 'no'} · '
-          'pinned: ${host ? pinned : 'n/a'}',
-          style: deckText(size: 12),
-        ),
+  /// A screen, not a snackbar: the long-press was showing one that evidently
+  /// never arrived, which left five releases with no signal at all.
+  void _showMetrics() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => DiagnosticsScreen(metrics: _metrics),
       ),
     );
   }

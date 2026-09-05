@@ -7,6 +7,38 @@ import 'package:flutter/services.dart';
 
 import 'models.dart';
 
+/// One shortcut the Android side recorded, before it becomes a [LaunchableApp].
+class StoredShortcutRecord {
+  const StoredShortcutRecord({
+    required this.label,
+    required this.packageName,
+    this.shortcutId,
+    this.intentUri,
+    this.icon,
+  });
+
+  final String label;
+  final String packageName;
+  final String? shortcutId;
+  final String? intentUri;
+  final Uint8List? icon;
+
+  /// Null when the record carries nothing launchable.
+  LaunchableApp? toApp() {
+    if (intentUri != null && intentUri!.isNotEmpty) {
+      return LaunchableApp.legacyShortcut(uri: intentUri!, label: label);
+    }
+    if (shortcutId != null && shortcutId!.isNotEmpty) {
+      return LaunchableApp.shortcut(
+        packageName: packageName,
+        id: shortcutId!,
+        label: label,
+      );
+    }
+    return null;
+  }
+}
+
 class LauncherBridge {
   LauncherBridge._();
 
@@ -162,28 +194,27 @@ class LauncherBridge {
         false;
   }
 
-  /// Apps that will build a shortcut when asked — the launcher-driven half of
-  /// "add to home screen", which many apps are the only route they offer.
-  Future<List<LaunchableApp>> listShortcutMakers() async {
+  /// Collects shortcuts recorded since the last ask, and clears them.
+  ///
+  /// The launcher can be destroyed while another app's shortcut picker is on
+  /// screen, so a result announced down the channel can arrive with nobody
+  /// listening. The Android side writes each one down; this is how they are
+  /// collected however long that took.
+  Future<List<StoredShortcutRecord>> takePendingShortcuts() async {
     final raw =
-        await _channel.invokeListMethod<Object?>('listShortcutMakers') ??
+        await _channel.invokeListMethod<Object?>('takePendingShortcuts') ??
             const [];
-    return raw
-        .whereType<Map<Object?, Object?>>()
-        .map(LaunchableApp.fromPlatform)
-        .toList();
+    return [
+      for (final entry in raw.whereType<Map<Object?, Object?>>())
+        StoredShortcutRecord(
+          label: (entry['label'] as String?) ?? 'Shortcut',
+          packageName: (entry['packageName'] as String?) ?? '',
+          shortcutId: entry['shortcutId'] as String?,
+          intentUri: entry['intentUri'] as String?,
+          icon: entry['icon'] as Uint8List?,
+        ),
+    ];
   }
-
-  /// Asks [maker] to build a shortcut. The answer comes back through
-  /// [onShortcutCreated] or [onShortcutsChanged], since the app takes over the
-  /// screen to build it.
-  Future<void> createShortcut(LaunchableApp maker) => _channel.invokeMethod<void>(
-        'createShortcut',
-        {
-          'packageName': maker.packageName,
-          'activityName': maker.activityName,
-        },
-      );
 
   /// Seeds the icon cache for a shortcut whose icon came with it rather than
   /// from the platform.
@@ -222,19 +253,15 @@ class LauncherBridge {
     return ScreenMetrics.fromPlatform(map ?? const {});
   }
 
-  /// Wires up the calls Kotlin makes on its own: HOME pressed while already
-  /// home, and the results of a shortcut the user just built.
+  /// Wires up the calls Kotlin makes on its own.
+  ///
+  /// Shortcut results are not among them: those are written down on the Android
+  /// side and collected with [takePendingShortcuts], because the launcher can
+  /// be destroyed while another app builds one. `shortcutsChanged` is only a
+  /// nudge to go and look.
   void onPlatformCalls({
     required void Function() onHomePressed,
     required void Function() onShortcutsChanged,
-    required void Function(
-      String packageName,
-      String shortcutId,
-      String label,
-      Uint8List? icon,
-    ) onShortcutPinned,
-    required void Function(String label, String uri, Uint8List? icon)
-        onLegacyShortcutCreated,
     required void Function() onShortcutFailed,
   }) {
     _channel.setMethodCallHandler((call) async {
@@ -243,23 +270,8 @@ class LauncherBridge {
           onHomePressed();
         case 'shortcutsChanged':
           onShortcutsChanged();
-        case 'shortcutPinned':
-          final args = (call.arguments as Map).cast<Object?, Object?>();
-          onShortcutPinned(
-            (args['packageName'] as String?) ?? '',
-            (args['shortcutId'] as String?) ?? '',
-            (args['label'] as String?) ?? 'Shortcut',
-            args['icon'] as Uint8List?,
-          );
         case 'shortcutFailed':
           onShortcutFailed();
-        case 'legacyShortcutCreated':
-          final args = (call.arguments as Map).cast<Object?, Object?>();
-          onLegacyShortcutCreated(
-            (args['label'] as String?) ?? 'Shortcut',
-            (args['uri'] as String?) ?? '',
-            args['icon'] as Uint8List?,
-          );
       }
       return null;
     });

@@ -70,26 +70,37 @@ conversation from a chat app — pins a shortcut here, and it then behaves like
 any other entry: it appears under all apps, can be filed on a card, searched
 for and launched.
 
-There are two entirely separate mechanisms behind "add to home screen", and a
-launcher that handles only one looks like it supports none:
+"Add to home screen" in any app sends a pin request, which Android hands to
+whichever launcher declares `CONFIRM_PIN_SHORTCUT` — and drops if none does,
+which is why the option looks broken from the other app's side until a launcher
+answers. Rolidecks declares it on the home activity with `CATEGORY_DEFAULT`:
+Launcher3, and so Lawnchair, puts it on a separate activity with that category;
+Fossify puts it on the home activity without. Both work, so this is the union
+rather than a guess between them.
 
-- **The app pushes a request.** Android hands it to whichever launcher declares
-  `CONFIRM_PIN_SHORTCUT` and drops it if none does. That filter sits on the home
-  activity, not on an activity of its own — the system resolves it against the
-  default launcher's package, and every launcher that works puts it there.
-- **The launcher asks the app.** Older apps, file managers especially, only
-  offer this route: the launcher starts their `ACTION_CREATE_SHORTCUT` activity
-  and gets back either a modern pin request or a bare intent, name and bitmap.
-  That is what the **Make a shortcut** list under all apps → Shortcuts is for.
+There is an older route too, a broadcast, which apps fall back to when the
+modern one reports itself unsupported — `InstallShortcutReceiver` answers that
+and files the result the same way.
 
-`lib/saved_shortcuts.dart` keeps every shortcut this launcher has accepted, of
-either kind, with its icon. A shortcut from the second route has to be kept —
-Android hands over an intent and forgets it exists. A pinned one does not have
-to be, but is anyway: asking the system for it back means being the shortcut
-host at the moment of asking and trusting a query to return what was pinned,
-where keeping what was accepted means it appears because it was added. The
-system's own list is still merged in, by id, to catch anything pinned before
-this launcher started keeping its own copy.
+**Only the home app receives any of them.** An empty Shortcuts tab says which of
+those two things it is and offers to fix the one that is fixable, and
+long-pressing settings opens a **Diagnostics** screen with the two flags that
+decide everything else: whether Rolidecks holds the home role, and whether
+Android is offering apps "add to home screen" at all. Chrome and DuckDuckGo both
+check that second one and quietly do something else when it is false, so a *no*
+there means the problem is upstream of anything this launcher does.
+
+`lib/saved_shortcuts.dart` keeps every shortcut this launcher has accepted, with
+its icon. Asking the system for them back means being the shortcut host at the
+moment of asking and trusting a query to return what was pinned; keeping what
+was accepted means a shortcut appears because it was added. The system's own
+list is still merged in, by id, to catch anything pinned earlier.
+
+Results are written down on the Android side before they are announced. This
+activity is `stateNotNeeded` and excluded from recents, so Android is free to
+destroy it while another app's confirm screen is up — a result sent straight
+down the method channel then arrives with nobody listening. They are collected
+on load and on resume instead, however long that took.
 
 All apps has **Apps** and **Shortcuts** tabs. Shortcuts arrive from elsewhere,
 there are far fewer of them, and the button to make one belongs beside them
