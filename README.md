@@ -70,11 +70,26 @@ conversation from a chat app — pins a shortcut here, and it then behaves like
 any other entry: it appears under all apps, can be filed on a card, searched
 for and launched.
 
-Nothing pins itself. Android hands a pin request to whichever launcher declares
-`CONFIRM_PIN_SHORTCUT`, and drops it if none does, which is why the option looks
-broken from the other app's side until a launcher answers.
-`PinShortcutActivity` accepts rather than asking a second time — you already
-tapped "add to home screen" — and toasts where the shortcut went.
+There are two entirely separate mechanisms behind "add to home screen", and a
+launcher that handles only one looks like it supports none:
+
+- **The app pushes a request.** Android hands it to whichever launcher declares
+  `CONFIRM_PIN_SHORTCUT` and drops it if none does. `PinShortcutActivity`
+  accepts rather than asking a second time — you already tapped the button —
+  and toasts the real reason when it cannot.
+- **The launcher asks the app.** Older apps, file managers especially, only
+  offer this route: the launcher starts their `ACTION_CREATE_SHORTCUT` activity
+  and gets back either a modern pin request or a bare intent, name and bitmap.
+  That is what the **Make a shortcut** list under all apps → Shortcuts is for.
+
+A shortcut from the second route is not remembered by Android at all — it hands
+over an intent and forgets — so `lib/legacy_shortcuts.dart` keeps those itself,
+icon included, and launches them by replaying the intent. Its identity is the
+intent, since there is nothing else to tell one from another.
+
+All apps has **Apps** and **Shortcuts** tabs. Shortcuts arrive from elsewhere,
+there are far fewer of them, and the button to make one belongs beside them
+rather than buried in a list of two hundred apps.
 
 Only the default launcher may read or start pinned shortcuts, so until Rolidecks
 is set as home the shortcut list is legitimately empty rather than an error.

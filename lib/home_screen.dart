@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'card_deck.dart';
@@ -11,6 +12,7 @@ import 'deck_store.dart';
 import 'edit_deck_screen.dart';
 import 'folder_screen.dart';
 import 'launcher_bridge.dart';
+import 'legacy_shortcuts.dart';
 import 'models.dart';
 import 'side_rail.dart';
 import 'stack_layout.dart';
@@ -29,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver {
   final _store = DeckStore();
   final _appCache = AppCache();
+  final _legacyShortcuts = LegacyShortcutStore();
 
   List<LaunchableApp> _installed = const [];
   CardDeck _deck = CardDeck.normalised(const []);
@@ -55,11 +58,16 @@ class _HomeScreenState extends State<HomeScreen>
     _load();
     _packageSub =
         LauncherBridge.instance.packageChanges.listen((_) => _refreshApps());
-    LauncherBridge.instance.onHomePressed(() {
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      setState(() => _focused = 0);
-    });
+    LauncherBridge.instance.onPlatformCalls(
+      onHomePressed: () {
+        if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        setState(() => _focused = 0);
+      },
+      onShortcutsChanged: _refreshApps,
+      onLegacyShortcutCreated: _storeLegacyShortcut,
+      onShortcutFailed: () => _toast('That app could not make a shortcut'),
+    );
   }
 
   @override
@@ -119,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen>
     // Concurrently, not one after another: these are three independent
     // round-trips and listApps is by far the slowest of them.
     final results = await Future.wait([
-      LauncherBridge.instance.listEverything(),
+      _everything(),
       LauncherBridge.instance.screenMetrics(),
       LauncherBridge.instance.isDefaultLauncher(),
     ]);
@@ -146,7 +154,55 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _refreshApps() async {
-    await _adopt(await LauncherBridge.instance.listEverything());
+    await _adopt(await _everything());
+  }
+
+  /// Everything launchable: apps, shortcuts the system remembers, and the
+  /// older kind only this launcher remembers.
+  Future<List<LaunchableApp>> _everything() async {
+    final results = await Future.wait([
+      LauncherBridge.instance.listEverything(),
+      _legacyShortcuts.load(),
+    ]);
+    final stored = results[1] as List<StoredShortcut>;
+    for (final entry in stored) {
+      // Their icons came with them rather than from the platform, so seed the
+      // cache the icon widget reads.
+      LauncherBridge.instance.primeIcon(entry.app.id, entry.icon);
+    }
+    return [
+      ...results[0] as List<LaunchableApp>,
+      for (final entry in stored) entry.app,
+    ];
+  }
+
+  Future<void> _storeLegacyShortcut(
+    String label,
+    String uri,
+    Uint8List? icon,
+  ) async {
+    if (uri.isEmpty) {
+      _toast('That shortcut had nothing to open');
+      return;
+    }
+    await _legacyShortcuts.add(
+      StoredShortcut(
+        app: LaunchableApp.legacyShortcut(uri: uri, label: label),
+        icon: icon,
+      ),
+    );
+    await _refreshApps();
+    _toast('Added $label — file it on a card');
+  }
+
+  void _toast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: DeckColors.surface,
+        content: Text(message, style: deckText(size: 12)),
+      ),
+    );
   }
 
   /// The manual refresh, for when something changed that neither a package
@@ -156,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() => _refreshing = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final apps = await LauncherBridge.instance.listEverything();
+      final apps = await _everything();
       final changed = appListsDiffer(_installed, apps);
       await _adopt(apps);
       if (!mounted) return;

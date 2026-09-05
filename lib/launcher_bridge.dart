@@ -143,9 +143,17 @@ class LauncherBridge {
       await _channel.invokeMethod<bool>('launch', {'packageName': packageName}) ??
       false;
 
-  /// Launches [app], dispatching on its kind — a shortcut goes through
-  /// LauncherApps rather than a launch intent.
+  /// Launches [app], dispatching on its kind: an app by launch intent, a
+  /// pinned shortcut through LauncherApps, and a legacy one by replaying the
+  /// intent it was created from.
   Future<bool> open(LaunchableApp app) async {
+    if (app.isLegacyShortcut) {
+      return await _channel.invokeMethod<bool>(
+            'launchIntentUri',
+            {'uri': app.intentUri},
+          ) ??
+          false;
+    }
     if (!app.isShortcut) return launch(app.packageName);
     return await _channel.invokeMethod<bool>('launchShortcut', {
           'packageName': app.packageName,
@@ -153,6 +161,33 @@ class LauncherBridge {
         }) ??
         false;
   }
+
+  /// Apps that will build a shortcut when asked — the launcher-driven half of
+  /// "add to home screen", which many apps are the only route they offer.
+  Future<List<LaunchableApp>> listShortcutMakers() async {
+    final raw =
+        await _channel.invokeListMethod<Object?>('listShortcutMakers') ??
+            const [];
+    return raw
+        .whereType<Map<Object?, Object?>>()
+        .map(LaunchableApp.fromPlatform)
+        .toList();
+  }
+
+  /// Asks [maker] to build a shortcut. The answer comes back through
+  /// [onShortcutCreated] or [onShortcutsChanged], since the app takes over the
+  /// screen to build it.
+  Future<void> createShortcut(LaunchableApp maker) => _channel.invokeMethod<void>(
+        'createShortcut',
+        {
+          'packageName': maker.packageName,
+          'activityName': maker.activityName,
+        },
+      );
+
+  /// Seeds the icon cache for a shortcut whose icon came with it rather than
+  /// from the platform.
+  void primeIcon(String key, Uint8List? bytes) => _iconCache[key] = bytes;
 
   Future<void> openAppInfo(String packageName) =>
       _channel.invokeMethod<void>('openAppInfo', {'packageName': packageName});
@@ -187,10 +222,31 @@ class LauncherBridge {
     return ScreenMetrics.fromPlatform(map ?? const {});
   }
 
-  /// Called from Kotlin when HOME is pressed while already on the home screen.
-  void onHomePressed(void Function() handler) {
+  /// Wires up the calls Kotlin makes on its own: HOME pressed while already
+  /// home, and the results of a shortcut the user just built.
+  void onPlatformCalls({
+    required void Function() onHomePressed,
+    required void Function() onShortcutsChanged,
+    required void Function(String label, String uri, Uint8List? icon)
+        onLegacyShortcutCreated,
+    required void Function() onShortcutFailed,
+  }) {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'homePressed') handler();
+      switch (call.method) {
+        case 'homePressed':
+          onHomePressed();
+        case 'shortcutsChanged':
+          onShortcutsChanged();
+        case 'shortcutFailed':
+          onShortcutFailed();
+        case 'legacyShortcutCreated':
+          final args = (call.arguments as Map).cast<Object?, Object?>();
+          onLegacyShortcutCreated(
+            (args['label'] as String?) ?? 'Shortcut',
+            (args['uri'] as String?) ?? '',
+            args['icon'] as Uint8List?,
+          );
+      }
       return null;
     });
   }

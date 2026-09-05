@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_icon.dart';
 import 'app_menu_sheet.dart';
 import 'app_tile.dart';
 import 'card_deck.dart';
@@ -29,9 +30,14 @@ class FolderScreen extends StatefulWidget {
   State<FolderScreen> createState() => _FolderScreenState();
 }
 
+/// The two halves of the all-apps card.
+enum _Tab { apps, shortcuts }
+
 class _FolderScreenState extends State<FolderScreen> {
   late CardDeck _deck = widget.deck;
   String _query = '';
+  _Tab _tab = _Tab.apps;
+  List<LaunchableApp> _makers = const [];
 
   /// The card's apps, resolved once rather than on every build. For the
   /// all-apps card that resolve sorts every app on the phone, and rebuilding
@@ -42,6 +48,19 @@ class _FolderScreenState extends State<FolderScreen> {
   DeckCard get _card {
     final index = _deck.indexOfId(widget.card.id);
     return index >= 0 ? _deck[index] : widget.card;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.card.isAllApps) _loadMakers();
+  }
+
+  Future<void> _loadMakers() async {
+    final makers = await LauncherBridge.instance.listShortcutMakers();
+    if (!mounted) return;
+    makers.sort(compareByLabel);
+    setState(() => _makers = makers);
   }
 
   @override
@@ -67,7 +86,16 @@ class _FolderScreenState extends State<FolderScreen> {
   Widget build(BuildContext context) {
     final card = _card;
     final color = colorOf(card.colorKey);
-    final apps = searchApps(_apps, _query);
+    final showingShortcuts = card.isAllApps && _tab == _Tab.shortcuts;
+    final apps = searchApps(
+      card.isAllApps
+          ? [
+              for (final entry in _apps)
+                if (entry.isShortcut == showingShortcuts) entry,
+            ]
+          : _apps,
+      _query,
+    );
 
     return Scaffold(
       backgroundColor: DeckColors.ground,
@@ -75,7 +103,9 @@ class _FolderScreenState extends State<FolderScreen> {
         child: Column(
           children: [
             _header(card, color),
+            if (card.isAllApps) _tabs(color),
             if (card.isAllApps) _search(),
+            if (showingShortcuts) _makerList(color),
             Expanded(
               child: apps.isEmpty
                   ? _empty(card)
@@ -136,6 +166,45 @@ class _FolderScreenState extends State<FolderScreen> {
     );
   }
 
+  /// Shortcuts are their own list rather than mixed into the apps: they arrive
+  /// from somewhere else, there are far fewer of them, and this is where the
+  /// button to make one belongs.
+  Widget _tabs(Color color) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      child: Row(
+        children: [
+          for (final tab in _Tab.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () => setState(() => _tab = tab),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: _tab == tab ? color : DeckColors.surface,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(
+                      color: _tab == tab ? color : DeckColors.surfaceEdge,
+                    ),
+                  ),
+                  child: Text(
+                    tab == _Tab.apps ? 'Apps' : 'Shortcuts',
+                    style: deckText(
+                      size: 12,
+                      weight: 600,
+                      color: _tab == tab ? onCardFor(color) : DeckColors.textDim,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _search() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
@@ -160,6 +229,21 @@ class _FolderScreenState extends State<FolderScreen> {
   }
 
   Widget _empty(DeckCard card) {
+    if (card.isAllApps && _tab == _Tab.shortcuts) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Text(
+            _query.trim().isEmpty
+                ? 'No shortcuts yet.\nMake one below, or add one from another '
+                    'app.'
+                : 'Nothing matches',
+            textAlign: TextAlign.center,
+            style: deckText(size: 13, color: DeckColors.textDim),
+          ),
+        ),
+      );
+    }
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -170,6 +254,48 @@ class _FolderScreenState extends State<FolderScreen> {
           textAlign: TextAlign.center,
           style: const TextStyle(color: DeckColors.textDim, fontSize: 13),
         ),
+      ),
+    );
+  }
+
+  /// The apps that will build a shortcut on request. Listed rather than hidden
+  /// behind a menu, because this is the only route many apps offer and there is
+  /// no way to guess which ones they are.
+  Widget _makerList(Color color) {
+    if (_makers.isEmpty) return const SizedBox.shrink();
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 190),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: DeckColors.surfaceEdge)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+            child: Text('Make a shortcut',
+                style: deckText(size: 11, color: DeckColors.textDim)),
+          ),
+          Flexible(
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: _makers.length,
+              itemBuilder: (context, index) {
+                final maker = _makers[index];
+                return ListTile(
+                  dense: true,
+                  leading: AppIconImage(app: maker, size: 26),
+                  title: Text(maker.label, style: deckText(size: 13)),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await LauncherBridge.instance.createShortcut(maker);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

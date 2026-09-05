@@ -37,6 +37,15 @@ class AppSnapshot {
     final rawApps = json['apps'];
     if (rawApps is! List) return null;
     try {
+      for (final entry in rawApps) {
+        // An entry needs something to launch: a package for an app or a pinned
+        // shortcut, an intent for a legacy one. Neither means the snapshot is
+        // corrupt, and refetching from the platform is always safe.
+        if (entry is! Map) return null;
+        final hasPackage = (entry['packageName'] as String?)?.isNotEmpty ?? false;
+        final hasIntent = (entry['intentUri'] as String?)?.isNotEmpty ?? false;
+        if (!hasPackage && !hasIntent) return null;
+      }
       return AppSnapshot(
         apps: [
           for (final entry in rawApps)

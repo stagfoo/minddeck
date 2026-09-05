@@ -94,6 +94,26 @@ void main() {
       expect(await AppCache().load(), isNull);
     });
 
+    test('a legacy shortcut with no package is fine, it has an intent', () async {
+      // Those are launched by replaying an intent, so they never carry a
+      // package — rejecting them for the missing field would drop every one.
+      SharedPreferences.setMockInitialValues({
+        'rolidecks.apps.v1': jsonEncode({
+          'schemaVersion': AppCache.schemaVersion,
+          'apps': [
+            {
+              'label': 'Downloads',
+              'kind': 'shortcut',
+              'intentUri': 'intent:#Intent;end',
+            },
+          ],
+        }),
+      });
+      final restored = await AppCache().load();
+      expect(restored, isNotNull);
+      expect(restored!.apps.single.isLegacyShortcut, isTrue);
+    });
+
     test('clear removes it', () async {
       final cache = AppCache();
       await cache.save([app('com.a')]);

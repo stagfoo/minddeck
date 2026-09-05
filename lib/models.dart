@@ -15,14 +15,31 @@ class LaunchableApp {
     this.isSystem = false,
     this.kind = LaunchKind.app,
     this.shortcutId,
+    this.intentUri,
   });
 
-  /// A shortcut pinned by another app.
+  /// A shortcut pinned by another app, which the system remembers.
   const LaunchableApp.shortcut({
     required this.packageName,
     required String id,
     required this.label,
   })  : shortcutId = id,
+        intentUri = null,
+        kind = LaunchKind.shortcut,
+        activityName = '',
+        isSystem = false;
+
+  /// A shortcut built the older way, as a bare intent.
+  ///
+  /// The system does not remember these — it hands the launcher an intent and a
+  /// name and forgets them — so the URI is the whole identity and the launcher
+  /// has to store it itself.
+  const LaunchableApp.legacyShortcut({
+    required String uri,
+    required this.label,
+    this.packageName = '',
+  })  : intentUri = uri,
+        shortcutId = null,
         kind = LaunchKind.shortcut,
         activityName = '',
         isSystem = false;
@@ -38,8 +55,13 @@ class LaunchableApp {
 
   final LaunchKind kind;
 
-  /// Set only for [LaunchKind.shortcut].
+  /// Set for a shortcut the system remembers.
   final String? shortcutId;
+
+  /// Set for a shortcut only this launcher remembers.
+  final String? intentUri;
+
+  bool get isLegacyShortcut => intentUri != null;
 
   bool get isShortcut => kind == LaunchKind.shortcut;
 
@@ -48,9 +70,11 @@ class LaunchableApp {
   /// Shortcuts are prefixed so they can never collide with an app whose
   /// activity happens to share the name, and so an id read back from an old
   /// deck still says which kind it was.
-  String get id => isShortcut
-      ? 'shortcut:$packageName/$shortcutId'
-      : '$packageName/$activityName';
+  String get id {
+    if (isLegacyShortcut) return 'legacy:$intentUri';
+    if (isShortcut) return 'shortcut:$packageName/$shortcutId';
+    return '$packageName/$activityName';
+  }
 
   Map<String, dynamic> toJson() => {
         'packageName': packageName,
@@ -59,18 +83,24 @@ class LaunchableApp {
         'isSystem': isSystem,
         if (isShortcut) 'kind': 'shortcut',
         if (shortcutId != null) 'shortcutId': shortcutId,
+        if (intentUri != null) 'intentUri': intentUri,
       };
 
   static LaunchableApp fromJson(Map<String, dynamic> json) {
     final shortcutId = json['shortcutId'] as String?;
-    final isShortcut = json['kind'] == 'shortcut' && shortcutId != null;
+    final intentUri = json['intentUri'] as String?;
+    final isShortcut =
+        json['kind'] == 'shortcut' && (shortcutId != null || intentUri != null);
     return LaunchableApp(
-      packageName: json['packageName'] as String,
+      packageName: (json['packageName'] as String?) ?? '',
       activityName: (json['activityName'] as String?) ?? '',
-      label: (json['label'] as String?) ?? json['packageName'] as String,
+      label: (json['label'] as String?) ??
+          (json['packageName'] as String?) ??
+          'Shortcut',
       isSystem: json['isSystem'] as bool? ?? false,
       kind: isShortcut ? LaunchKind.shortcut : LaunchKind.app,
       shortcutId: shortcutId,
+      intentUri: intentUri,
     );
   }
 

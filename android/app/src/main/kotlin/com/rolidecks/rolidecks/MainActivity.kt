@@ -46,14 +46,17 @@ class MainActivity : FlutterActivity() {
     private val worker = Executors.newFixedThreadPool(4)
     private val main = Handler(Looper.getMainLooper())
 
+    private val requestCreateShortcut = 4011
+    private var channel: MethodChannel? = null
     private var packageEvents: EventChannel.EventSink? = null
     private var packageReceiver: BroadcastReceiver? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, methodChannelName)
-            .setMethodCallHandler { call, result -> handle(call, result) }
+        channel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger, methodChannelName
+        ).also { it.setMethodCallHandler { call, result -> handle(call, result) } }
 
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, eventChannelName)
             .setStreamHandler(object : EventChannel.StreamHandler {
@@ -77,9 +80,7 @@ class MainActivity : FlutterActivity() {
         super.onNewIntent(intent)
         if (intent.hasCategory(Intent.CATEGORY_HOME)) {
             main.post {
-                MethodChannel(
-                    flutterEngine!!.dartExecutor.binaryMessenger, methodChannelName
-                ).invokeMethod("homePressed", null)
+                channel?.invokeMethod("homePressed", null)
             }
         }
     }
@@ -130,6 +131,17 @@ class MainActivity : FlutterActivity() {
             "isDefaultLauncher" -> result.success(isDefaultLauncher())
             "screenMetrics" -> result.success(screenMetrics())
             "shortcutDiagnostics" -> onWorker(result) { shortcutDiagnostics() }
+            "listShortcutMakers" -> onWorker(result) { listShortcutMakers() }
+            "createShortcut" -> {
+                createShortcut(
+                    call.argument<String>("packageName") ?: "",
+                    call.argument<String>("activityName") ?: ""
+                )
+                result.success(null)
+            }
+            "launchIntentUri" -> result.success(
+                launchIntentUri(call.argument<String>("uri") ?: "")
+            )
             else -> result.notImplemented()
         }
     }
@@ -225,6 +237,93 @@ class MainActivity : FlutterActivity() {
             "pinnedCount" to if (host) listShortcuts().size else -1,
             "isDefaultLauncher" to isDefaultLauncher()
         )
+    }
+
+    /**
+     * Apps that can make a shortcut when asked.
+     *
+     * The other half of "add to home screen": rather than the app pushing a
+     * pin request at whatever launcher will take it, the launcher asks the app
+     * to build one. Plenty of apps — file managers especially — only offer
+     * this older route, which is why a launcher that handles only pin requests
+     * looks like it does not support shortcuts at all.
+     */
+    @Suppress("DEPRECATION")
+    private fun listShortcutMakers(): List<Map<String, Any?>> {
+        val intent = Intent(Intent.ACTION_CREATE_SHORTCUT)
+        return packageManager.queryIntentActivities(intent, 0).map { info ->
+            mapOf(
+                "packageName" to info.activityInfo.packageName,
+                "activityName" to info.activityInfo.name,
+                "label" to info.loadLabel(packageManager).toString()
+            )
+        }
+    }
+
+    private fun createShortcut(packageName: String, activityName: String) {
+        val intent = Intent(Intent.ACTION_CREATE_SHORTCUT)
+            .setClassName(packageName, activityName)
+        try {
+            startActivityForResult(intent, requestCreateShortcut)
+        } catch (e: Exception) {
+            main.post { channel?.invokeMethod("shortcutFailed", null) }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != requestCreateShortcut || resultCode != RESULT_OK || data == null) {
+            return
+        }
+
+        // A modern app answers the same request with a pin request rather than
+        // the old extras, so try that first: accepting it hands the shortcut to
+        // the system, which then lists it like any other pinned one.
+        val pinRequest = try {
+            launcherApps.getPinItemRequest(data)
+        } catch (e: Exception) {
+            null
+        }
+        if (pinRequest != null && pinRequest.isValid && pinRequest.accept()) {
+            main.post { channel?.invokeMethod("shortcutsChanged", null) }
+            return
+        }
+
+        // Otherwise the old shape: an intent, a name and a bitmap. The system
+        // does not remember these, so they are handed to Dart to keep.
+        val shortcutIntent =
+            data.getParcelableExtra<Intent>(Intent.EXTRA_SHORTCUT_INTENT) ?: return
+        val label = data.getStringExtra(Intent.EXTRA_SHORTCUT_NAME) ?: "Shortcut"
+        val icon = data.getParcelableExtra<Bitmap>(Intent.EXTRA_SHORTCUT_ICON)
+
+        main.post {
+            channel?.invokeMethod(
+                "legacyShortcutCreated",
+                mapOf(
+                    "label" to label,
+                    "uri" to shortcutIntent.toUri(Intent.URI_INTENT_SCHEME),
+                    "icon" to icon?.let {
+                        val stream = ByteArrayOutputStream()
+                        it.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                        stream.toByteArray()
+                    }
+                )
+            )
+        }
+    }
+
+    /** Launches a shortcut the system does not know about, stored as a URI. */
+    private fun launchIntentUri(uri: String): Boolean {
+        return try {
+            startActivity(
+                Intent.parseUri(uri, Intent.URI_INTENT_SCHEME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun launchShortcut(packageName: String, shortcutId: String): Boolean {
