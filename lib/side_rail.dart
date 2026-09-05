@@ -40,16 +40,47 @@ class SideRail extends StatefulWidget {
 class _SideRailState extends State<SideRail> {
   bool _dragging = false;
 
+  /// The card this rail last ticked for.
+  ///
+  /// Comparing against widget.focusedIndex alone assumed the parent had already
+  /// rebuilt with the new index before the next drag update arrived. It has
+  /// not, mid-gesture — so a slow thumb crossing one boundary ticked on every
+  /// frame after it rather than once. The rail keeps its own count so a tick
+  /// never waits on a round trip.
+  int? _lastTicked;
+
+  @override
+  void didUpdateWidget(SideRail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Focus moved somewhere else — a swipe on the stack, the deck reloading —
+    // so the rail's own count follows rather than suppressing the next tick.
+    if (oldWidget.focusedIndex != widget.focusedIndex) {
+      _lastTicked = widget.focusedIndex;
+    }
+  }
+
   void _select(double y, double trackHeight) {
     final index = cardIndexForKnobPosition(
       y: y,
       trackHeight: trackHeight,
       cardCount: widget.cardCount,
     );
-    if (index != widget.focusedIndex) {
-      HapticFeedback.selectionClick();
-      widget.onFocusChanged(index);
-    }
+    if (index == (_lastTicked ?? widget.focusedIndex)) return;
+    _lastTicked = index;
+    _tick();
+    widget.onFocusChanged(index);
+  }
+
+  /// One tick per card the grip passes, so the deck feels like it has detents
+  /// rather than sliding.
+  ///
+  /// The system click rather than a bundled sound: it is the tick Android
+  /// already uses, it needs no asset or audio plugin, and it obeys the phone's
+  /// touch-sounds setting — so "subtle" includes silent for anyone who has
+  /// turned those off, without this needing a setting of its own.
+  void _tick() {
+    HapticFeedback.selectionClick();
+    SystemSound.play(SystemSoundType.click);
   }
 
   @override
