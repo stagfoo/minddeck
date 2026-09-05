@@ -129,6 +129,7 @@ class MainActivity : FlutterActivity() {
             }
             "isDefaultLauncher" -> result.success(isDefaultLauncher())
             "screenMetrics" -> result.success(screenMetrics())
+            "shortcutDiagnostics" -> onWorker(result) { shortcutDiagnostics() }
             else -> result.notImplemented()
         }
     }
@@ -209,6 +210,21 @@ class MainActivity : FlutterActivity() {
             }
         }
         return out
+    }
+
+    /// Why the shortcut list is the length it is.
+    ///
+    /// Pinning happens in another app and lands in a second activity, so when
+    /// nothing shows up there is no way to tell from the deck whether the
+    /// request never arrived, was refused, or arrived and is simply not being
+    /// read. This answers that without a cable.
+    private fun shortcutDiagnostics(): Map<String, Any> {
+        val host = launcherApps.hasShortcutHostPermission()
+        return mapOf(
+            "isShortcutHost" to host,
+            "pinnedCount" to if (host) listShortcuts().size else -1,
+            "isDefaultLauncher" to isDefaultLauncher()
+        )
     }
 
     private fun launchShortcut(packageName: String, shortcutId: String): Boolean {

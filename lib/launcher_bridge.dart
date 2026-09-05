@@ -170,6 +170,18 @@ class LauncherBridge {
   Future<bool> isDefaultLauncher() async =>
       await _channel.invokeMethod<bool>('isDefaultLauncher') ?? false;
 
+  /// Whether shortcuts can be read at all, and how many are pinned. Pinning
+  /// happens in another app, so when nothing appears this is the only way to
+  /// tell a request that never arrived from one that was never read.
+  Future<Map<String, Object?>> shortcutDiagnostics() async {
+    final map =
+        await _channel.invokeMapMethod<Object?, Object?>('shortcutDiagnostics');
+    return {
+      for (final entry in (map ?? const {}).entries)
+        '${entry.key}': entry.value,
+    };
+  }
+
   Future<ScreenMetrics> screenMetrics() async {
     final map = await _channel.invokeMapMethod<Object?, Object?>('screenMetrics');
     return ScreenMetrics.fromPlatform(map ?? const {});

@@ -403,14 +403,25 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _showMetrics() {
+  Future<void> _showMetrics() async {
     final metrics = _metrics;
-    if (metrics == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    final shortcuts = await LauncherBridge.instance.shortcutDiagnostics();
+    if (!mounted) return;
+
+    final host = shortcuts['isShortcutHost'] == true;
+    final pinned = shortcuts['pinnedCount'];
+    messenger.showSnackBar(
       SnackBar(
         backgroundColor: DeckColors.surface,
-        content: Text('$metrics',
-            style: const TextStyle(color: DeckColors.text, fontSize: 12)),
+        duration: const Duration(seconds: 6),
+        content: Text(
+          '${metrics ?? 'metrics pending'}\n'
+          'home app: ${shortcuts['isDefaultLauncher'] == true ? 'yes' : 'no'} · '
+          'can read shortcuts: ${host ? 'yes' : 'no'} · '
+          'pinned: ${host ? pinned : 'n/a'}',
+          style: deckText(size: 12),
+        ),
       ),
     );
   }
