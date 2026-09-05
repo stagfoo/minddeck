@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'card_deck.dart';
 import 'card_style.dart';
 import 'color_picker_screen.dart';
+import 'style_recents.dart';
 import 'icon_picker_screen.dart';
 import 'theme.dart';
 
@@ -72,8 +73,26 @@ class _CardEditorSheet extends StatefulWidget {
 
 class _CardEditorSheetState extends State<_CardEditorSheet> {
   late DeckCard _draft = widget.card;
+  final _recents = StyleRecents();
+  List<String> _recentColors = const [];
+  List<String> _recentIcons = const [];
   late final TextEditingController _name =
       TextEditingController(text: widget.card.name);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecents();
+  }
+
+  Future<void> _loadRecents() async {
+    final results = await Future.wait([_recents.colors(), _recents.icons()]);
+    if (!mounted) return;
+    setState(() {
+      _recentColors = results[0];
+      _recentIcons = results[1];
+    });
+  }
 
   @override
   void dispose() {
@@ -247,7 +266,15 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
       cardName: _draft.name.trim().isEmpty ? widget.card.name : _draft.name,
       iconKey: _draft.iconKey,
     );
-    if (picked != null) setState(() => _draft = _draft.copyWith(colorKey: picked));
+    if (picked == null) return;
+    setState(() => _draft = _draft.copyWith(colorKey: picked));
+    // Only a custom colour is worth keeping: a preset is already on the shelf.
+    if (!isCustomColorKey(picked)) return;
+    final updated = await _recents.addColor(
+      picked,
+      presets: [for (final entry in cardPalette) entry.key],
+    );
+    if (mounted) setState(() => _recentColors = updated);
   }
 
   Widget _swatches() {
@@ -255,36 +282,36 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
       spacing: 10,
       runSpacing: 10,
       children: [
-        // Presets for the usual case, the full picker for any other colour —
-        // the same shape as the icons.
-        GestureDetector(
+        // Presets for the usual case, the picker for any other colour, and
+        // whatever has been picked before so the second use is a tap.
+        _PickerTile(
+          icon: Icons.colorize_rounded,
           onTap: _pickColor,
-          child: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(
-                color: isCustomColorKey(_draft.colorKey)
-                    ? DeckColors.text
-                    : DeckColors.surfaceEdge,
-                width: isCustomColorKey(_draft.colorKey) ? 2.5 : 1,
-              ),
-              gradient: const SweepGradient(
-                colors: [
-                  Color(0xFFFF2BB5),
-                  Color(0xFFFF9A0E),
-                  Color(0xFF2BE04B),
-                  Color(0xFF3FE3F0),
-                  Color(0xFF8E8CF8),
-                  Color(0xFFFF2BB5),
-                ],
-              ),
-            ),
-            child: Icon(Icons.colorize_rounded,
-                size: 18, color: DeckColors.onCard),
-          ),
+          selected: isCustomColorKey(_draft.colorKey),
         ),
+        for (final key in _recentColors)
+          GestureDetector(
+            onTap: () => setState(() => _draft = _draft.copyWith(colorKey: key)),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: colorOf(key),
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(
+                  color: _draft.colorKey == key
+                      ? DeckColors.text
+                      : Colors.transparent,
+                  width: 2.5,
+                ),
+              ),
+              child: _draft.colorKey == key
+                  ? Icon(Icons.check_rounded,
+                      size: 20, color: onCardForKey(key))
+                  : null,
+            ),
+          ),
         for (final color in cardPalette)
           GestureDetector(
             onTap: () =>
@@ -319,7 +346,10 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
       current: _draft.iconKey,
       accent: colorOf(_draft.colorKey),
     );
-    if (picked != null) setState(() => _draft = _draft.copyWith(iconKey: picked));
+    if (picked == null) return;
+    setState(() => _draft = _draft.copyWith(iconKey: picked));
+    final updated = await _recents.addIcon(picked, presets: popularIconKeys);
+    if (mounted) setState(() => _recentIcons = updated);
   }
 
   Widget _icons() {
@@ -328,22 +358,14 @@ class _CardEditorSheetState extends State<_CardEditorSheet> {
       runSpacing: 10,
       children: [
         // The common ones are a tap; everything else is a search away. All
-        // 2,200 laid out here would be a wall, not a choice.
-        GestureDetector(
+        // 2,200 laid out here would be a wall, not a choice. Same tile as the
+        // colour picker's, so the two read as the same kind of door.
+        _PickerTile(
+          icon: Icons.search_rounded,
           onTap: _pickIcon,
-          child: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: DeckColors.surface,
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(color: DeckColors.surfaceEdge),
-            ),
-            child: const Icon(Icons.search,
-                size: 20, color: DeckColors.textDim),
-          ),
+          selected: !popularIconKeys.contains(_draft.iconKey),
         ),
-        for (final key in popularIconKeys)
+        for (final key in [..._recentIcons, ...popularIconKeys])
           GestureDetector(
             onTap: () => setState(() => _draft = _draft.copyWith(iconKey: key)),
             child: AnimatedContainer(
@@ -394,6 +416,56 @@ class _DeleteButton extends StatelessWidget {
         ),
         child: const Icon(Icons.delete_outline_rounded,
             size: 20, color: Color(0xFFFF6B5A)),
+      ),
+    );
+  }
+}
+
+/// The tile that opens a full picker, for either colour or icon.
+///
+/// One widget so the two cannot drift apart: they do the same thing — leave
+/// this shelf and go and find something — and the rainbow says so. The icon
+/// search used to be a plain grey square, which read as just another choice
+/// rather than a door out.
+class _PickerTile extends StatelessWidget {
+  const _PickerTile({
+    required this.icon,
+    required this.onTap,
+    required this.selected,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  /// Whether the card is currently wearing something that came from here, so
+  /// the shelf still shows what is chosen even when it is not on it.
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(
+            color: selected ? DeckColors.text : DeckColors.surfaceEdge,
+            width: selected ? 2.5 : 1,
+          ),
+          gradient: const SweepGradient(
+            colors: [
+              Color(0xFFFF2BB5),
+              Color(0xFFFF9A0E),
+              Color(0xFF2BE04B),
+              Color(0xFF3FE3F0),
+              Color(0xFF8E8CF8),
+              Color(0xFFFF2BB5),
+            ],
+          ),
+        ),
+        child: Icon(icon, size: 18, color: DeckColors.onCard),
       ),
     );
   }

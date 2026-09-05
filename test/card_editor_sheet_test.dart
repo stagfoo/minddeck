@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rolidecks/card_deck.dart';
 import 'package:rolidecks/card_editor_sheet.dart';
 
-const card = DeckCard(id: 'c', name: 'media', colorKey: 'cyan', iconKey: 'music');
+const card = DeckCard(
+  id: 'c',
+  name: 'media',
+  colorKey: 'cyan',
+  iconKey: 'music',
+);
 
 /// Opens the editor and hands back whatever it returns.
 Future<CardEditResult?> open(
@@ -12,25 +18,27 @@ Future<CardEditResult?> open(
   int folderCount = 5,
 }) async {
   CardEditResult? result;
-  await tester.pumpWidget(MaterialApp(
-    home: Builder(
-      builder: (context) => Scaffold(
-        body: Center(
-          child: ElevatedButton(
-            onPressed: () async {
-              result = await showCardEditor(
-                context,
-                card,
-                position: position,
-                folderCount: folderCount,
-              );
-            },
-            child: const Text('open'),
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () async {
+                result = await showCardEditor(
+                  context,
+                  card,
+                  position: position,
+                  folderCount: folderCount,
+                );
+              },
+              child: const Text('open'),
+            ),
           ),
         ),
       ),
     ),
-  ));
+  );
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
   return result;
@@ -46,7 +54,75 @@ Future<void> tapDelete(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// The gradient container behind a picker tile, found via its glyph.
+BoxDecoration decorationBehind(WidgetTester tester, IconData icon) {
+  final container = find
+      .ancestor(of: find.byIcon(icon), matching: find.byType(Container))
+      .first;
+  return tester.widget<Container>(container).decoration! as BoxDecoration;
+}
+
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  group('the two picker tiles match', () {
+    testWidgets('both wear the same rainbow, so they read as the same door', (
+      tester,
+    ) async {
+      // The icon search used to be a plain grey square, which read as another
+      // choice rather than a way out to the full set.
+      await open(tester);
+      final colour = decorationBehind(tester, Icons.colorize_rounded);
+      final icon = decorationBehind(tester, Icons.search_rounded);
+
+      expect(colour.gradient, isA<SweepGradient>());
+      expect(icon.gradient, isA<SweepGradient>());
+      expect(
+        (icon.gradient! as SweepGradient).colors,
+        (colour.gradient! as SweepGradient).colors,
+      );
+      expect(icon.borderRadius, colour.borderRadius);
+    });
+  });
+
+  group('what was picked before comes back', () {
+    testWidgets('a saved custom colour appears in the grid', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'rolidecks.recentColors.v1': ['#ff3366'],
+      });
+      await open(tester);
+      await tester.pumpAndSettle();
+
+      // Twelve presets, the picker tile, and the remembered colour.
+      final swatches = find.byType(AnimatedContainer);
+      expect(swatches, findsWidgets);
+      expect(
+        tester
+            .widgetList<AnimatedContainer>(swatches)
+            .map((c) => (c.decoration! as BoxDecoration).color)
+            .contains(const Color(0xFFFF3366)),
+        isTrue,
+      );
+    });
+
+    testWidgets('a saved icon appears alongside the common ones', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'rolidecks.recentIcons.v1': ['rocket_launch'],
+      });
+      await open(tester);
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.rocket_launch_rounded), findsOneWidget);
+    });
+
+    testWidgets('nothing saved yet just shows the presets', (tester) async {
+      await open(tester);
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.rocket_launch_rounded), findsNothing);
+    });
+  });
+
   group('delete', () {
     testWidgets('carries the card position through untouched', (tester) async {
       // Reordering moved to a drag on the cards themselves; the sheet only
@@ -86,8 +162,9 @@ void main() {
       expect(find.text('podcasts'), findsNWidgets(2));
     });
 
-    testWidgets('an emptied name falls back rather than blanking the card',
-        (tester) async {
+    testWidgets('an emptied name falls back rather than blanking the card', (
+      tester,
+    ) async {
       await open(tester);
       await tester.enterText(find.byType(TextField), '   ');
       await tester.pump();

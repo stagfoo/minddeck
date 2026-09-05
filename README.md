@@ -89,6 +89,15 @@ swatches. The picker tile beside them opens any colour at all, and icons work
 the same way: three dozen common ones for a tap, with the whole rounded Material
 set — all 2,200 — behind the search tile.
 
+Both grids remember. A custom colour, or an icon found by searching, is
+appended to the grid it was reached from and kept across restarts — picking one
+is deliberate work, and having to redo it for the next card wastes it. Presets
+are never remembered, since they are already on the shelf, and re-picking
+something moves it up rather than duplicating it. Twelve of each, newest first.
+
+Both grids open their full picker through the same rainbow tile, so the two read
+as the same kind of door rather than as one more swatch.
+
 A custom colour breaks the constraint the palette exists to keep, so `onCardFor`
 picks black or white per card from the background's relative luminance. Every
 palette colour still takes black, which is why the stack looks like one thing;
