@@ -14,6 +14,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
@@ -72,12 +73,71 @@ class MainActivity : FlutterActivity() {
             })
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // The pin request can be what started this activity, not only what
+        // arrives at a running one.
+        handlePinIntent(intent)
+    }
+
+    /**
+     * Accepts an "add to home screen" request, and keeps what it was given.
+     *
+     * The ShortcutInfo is captured here rather than looked up afterwards. Every
+     * launcher that works does it this way, and it means a shortcut appears
+     * because it was accepted rather than because a later query happened to
+     * return it — which is one fewer thing that has to be true.
+     */
+    private fun handlePinIntent(intent: Intent?) {
+        if (intent?.action != LauncherApps.ACTION_CONFIRM_PIN_SHORTCUT) return
+
+        val request = try {
+            launcherApps.getPinItemRequest(intent)
+        } catch (e: Exception) {
+            null
+        }
+        if (request == null ||
+            request.requestType != LauncherApps.PinItemRequest.REQUEST_TYPE_SHORTCUT
+        ) {
+            return
+        }
+
+        val shortcut = request.shortcutInfo
+        if (shortcut == null || !request.accept()) {
+            main.post { channel?.invokeMethod("shortcutFailed", null) }
+            return
+        }
+
+        val icon = try {
+            launcherApps.getShortcutIconDrawable(
+                shortcut,
+                resources.displayMetrics.densityDpi
+            )?.let { rasterise(it, 144) }
+        } catch (e: Exception) {
+            null
+        }
+
+        main.post {
+            channel?.invokeMethod(
+                "shortcutPinned",
+                mapOf(
+                    "packageName" to shortcut.getPackage(),
+                    "shortcutId" to shortcut.id,
+                    "label" to (shortcut.longLabel ?: shortcut.shortLabel ?: shortcut.id)
+                        .toString(),
+                    "icon" to icon
+                )
+            )
+        }
+    }
+
     /**
      * Pressing home while already home should reset to the top level rather
      * than do nothing, the way every stock launcher behaves.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        handlePinIntent(intent)
         if (intent.hasCategory(Intent.CATEGORY_HOME)) {
             main.post {
                 channel?.invokeMethod("homePressed", null)
@@ -285,9 +345,31 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             null
         }
-        if (pinRequest != null && pinRequest.isValid && pinRequest.accept()) {
-            main.post { channel?.invokeMethod("shortcutsChanged", null) }
-            return
+        if (pinRequest != null && pinRequest.isValid) {
+            val shortcut = pinRequest.shortcutInfo
+            if (shortcut != null && pinRequest.accept()) {
+                val icon = try {
+                    launcherApps.getShortcutIconDrawable(
+                        shortcut,
+                        resources.displayMetrics.densityDpi
+                    )?.let { rasterise(it, 144) }
+                } catch (e: Exception) {
+                    null
+                }
+                main.post {
+                    channel?.invokeMethod(
+                        "shortcutPinned",
+                        mapOf(
+                            "packageName" to shortcut.getPackage(),
+                            "shortcutId" to shortcut.id,
+                            "label" to (shortcut.longLabel ?: shortcut.shortLabel
+                                ?: shortcut.id).toString(),
+                            "icon" to icon
+                        )
+                    )
+                }
+                return
+            }
         }
 
         // Otherwise the old shape: an intent, a name and a bitmap. The system

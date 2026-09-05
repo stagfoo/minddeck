@@ -1,8 +1,12 @@
-/// Shortcuts the system does not remember.
+/// Every shortcut this launcher has accepted, kept by the launcher itself.
 ///
-/// The older "add to home screen" hands the launcher an intent, a name and a
-/// bitmap and then forgets about it — unlike a pinned shortcut, nothing in
-/// Android knows it exists. So the launcher keeps them, icon and all.
+/// Both kinds are stored, for different reasons. The older "add to home screen"
+/// hands over an intent, a name and a bitmap and then forgets — nothing in
+/// Android knows it exists. A pinned shortcut *is* known to the system, but
+/// asking for it back means being the shortcut host at the moment of asking and
+/// trusting a query to return what was pinned; keeping what was accepted
+/// instead means a shortcut appears because it was added, which is one fewer
+/// thing that has to be true.
 library;
 
 import 'dart:convert';
@@ -27,7 +31,10 @@ class StoredShortcut {
   static StoredShortcut? fromJson(Object? json) {
     if (json is! Map) return null;
     final map = json.cast<String, dynamic>();
-    if (map['intentUri'] is! String) return null;
+    // Either kind: an intent to replay, or a shortcut the system knows by id.
+    final hasIntent = map['intentUri'] is String;
+    final hasShortcutId = map['shortcutId'] is String;
+    if (!hasIntent && !hasShortcutId) return null;
     final raw = map['icon'];
     Uint8List? icon;
     if (raw is String) {
@@ -41,8 +48,8 @@ class StoredShortcut {
   }
 }
 
-class LegacyShortcutStore {
-  static const _key = 'rolidecks.legacyShortcuts.v1';
+class SavedShortcutStore {
+  static const _key = 'rolidecks.savedShortcuts.v2';
 
   Future<List<StoredShortcut>> load() async {
     final prefs = await SharedPreferences.getInstance();

@@ -74,18 +74,22 @@ There are two entirely separate mechanisms behind "add to home screen", and a
 launcher that handles only one looks like it supports none:
 
 - **The app pushes a request.** Android hands it to whichever launcher declares
-  `CONFIRM_PIN_SHORTCUT` and drops it if none does. `PinShortcutActivity`
-  accepts rather than asking a second time — you already tapped the button —
-  and toasts the real reason when it cannot.
+  `CONFIRM_PIN_SHORTCUT` and drops it if none does. That filter sits on the home
+  activity, not on an activity of its own — the system resolves it against the
+  default launcher's package, and every launcher that works puts it there.
 - **The launcher asks the app.** Older apps, file managers especially, only
   offer this route: the launcher starts their `ACTION_CREATE_SHORTCUT` activity
   and gets back either a modern pin request or a bare intent, name and bitmap.
   That is what the **Make a shortcut** list under all apps → Shortcuts is for.
 
-A shortcut from the second route is not remembered by Android at all — it hands
-over an intent and forgets — so `lib/legacy_shortcuts.dart` keeps those itself,
-icon included, and launches them by replaying the intent. Its identity is the
-intent, since there is nothing else to tell one from another.
+`lib/saved_shortcuts.dart` keeps every shortcut this launcher has accepted, of
+either kind, with its icon. A shortcut from the second route has to be kept —
+Android hands over an intent and forgets it exists. A pinned one does not have
+to be, but is anyway: asking the system for it back means being the shortcut
+host at the moment of asking and trusting a query to return what was pinned,
+where keeping what was accepted means it appears because it was added. The
+system's own list is still merged in, by id, to catch anything pinned before
+this launcher started keeping its own copy.
 
 All apps has **Apps** and **Shortcuts** tabs. Shortcuts arrive from elsewhere,
 there are far fewer of them, and the button to make one belongs beside them

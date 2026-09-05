@@ -36,6 +36,15 @@
                  is kept as well so it can still be opened from the current
                  launcher's app drawer while it isn't the default yet — handy
                  during development, harmless afterwards. -->
+            <!-- On the home activity, not an activity of its own. The system
+                 resolves this against the default launcher's package, and
+                 every launcher that works puts it here — a separate activity
+                 was the one part of this that had no precedent. No DEFAULT
+                 category: the system sends the action on its own. -->
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT"/>
+            </intent-filter>
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.HOME"/>
@@ -44,22 +53,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Accepts "add to home screen" from other apps. Android delivers a
-             pin request to whichever launcher declares this; with no handler
-             the request is dropped and the option looks broken from the other
-             app's side. Translucent and excluded from recents because it
-             accepts and finishes without a screen of its own. -->
-        <activity
-            android:name=".PinShortcutActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:noHistory="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

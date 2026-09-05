@@ -12,7 +12,7 @@ import 'deck_store.dart';
 import 'edit_deck_screen.dart';
 import 'folder_screen.dart';
 import 'launcher_bridge.dart';
-import 'legacy_shortcuts.dart';
+import 'saved_shortcuts.dart';
 import 'models.dart';
 import 'side_rail.dart';
 import 'stack_layout.dart';
@@ -31,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver {
   final _store = DeckStore();
   final _appCache = AppCache();
-  final _legacyShortcuts = LegacyShortcutStore();
+  final _savedShortcuts = SavedShortcutStore();
 
   List<LaunchableApp> _installed = const [];
   CardDeck _deck = CardDeck.normalised(const []);
@@ -65,6 +65,7 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() => _focused = 0);
       },
       onShortcutsChanged: _refreshApps,
+      onShortcutPinned: _storePinnedShortcut,
       onLegacyShortcutCreated: _storeLegacyShortcut,
       onShortcutFailed: () => _toast('That app could not make a shortcut'),
     );
@@ -162,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<List<LaunchableApp>> _everything() async {
     final results = await Future.wait([
       LauncherBridge.instance.listEverything(),
-      _legacyShortcuts.load(),
+      _savedShortcuts.load(),
     ]);
     final stored = results[1] as List<StoredShortcut>;
     for (final entry in stored) {
@@ -170,10 +171,36 @@ class _HomeScreenState extends State<HomeScreen>
       // cache the icon widget reads.
       LauncherBridge.instance.primeIcon(entry.app.id, entry.icon);
     }
-    return [
-      ...results[0] as List<LaunchableApp>,
-      for (final entry in stored) entry.app,
-    ];
+    // The system's own list is kept as a second source: it catches anything
+    // pinned before this launcher started keeping its own copy. Merged by id,
+    // so a shortcut in both appears once.
+    final merged = <String, LaunchableApp>{
+      for (final app in results[0] as List<LaunchableApp>) app.id: app,
+    };
+    for (final entry in stored) {
+      merged[entry.app.id] = entry.app;
+    }
+    return merged.values.toList();
+  }
+
+  Future<void> _storePinnedShortcut(
+    String packageName,
+    String shortcutId,
+    String label,
+    Uint8List? icon,
+  ) async {
+    await _savedShortcuts.add(
+      StoredShortcut(
+        app: LaunchableApp.shortcut(
+          packageName: packageName,
+          id: shortcutId,
+          label: label,
+        ),
+        icon: icon,
+      ),
+    );
+    await _refreshApps();
+    _toast('Added $label — file it on a card');
   }
 
   Future<void> _storeLegacyShortcut(
@@ -185,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen>
       _toast('That shortcut had nothing to open');
       return;
     }
-    await _legacyShortcuts.add(
+    await _savedShortcuts.add(
       StoredShortcut(
         app: LaunchableApp.legacyShortcut(uri: uri, label: label),
         icon: icon,

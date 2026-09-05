@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rolidecks/card_deck.dart';
-import 'package:rolidecks/legacy_shortcuts.dart';
+import 'package:rolidecks/saved_shortcuts.dart';
 import 'package:rolidecks/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -39,27 +39,27 @@ void main() {
 
   group('storage', () {
     test('survives a save and load, icon and all', () async {
-      final store = LegacyShortcutStore();
+      final store = SavedShortcutStore();
       await store.add(StoredShortcut(
         app: downloads,
         icon: Uint8List.fromList([1, 2, 3]),
       ));
 
-      final restored = (await LegacyShortcutStore().load()).single;
+      final restored = (await SavedShortcutStore().load()).single;
       expect(restored.app.label, 'Downloads');
       expect(restored.app.intentUri, downloads.intentUri);
       expect(restored.icon, [1, 2, 3]);
     });
 
     test('one without an icon is still stored', () async {
-      final store = LegacyShortcutStore();
+      final store = SavedShortcutStore();
       await store.add(StoredShortcut(app: downloads));
       expect((await store.load()).single.icon, isNull);
     });
 
     test('adding the same shortcut twice replaces rather than duplicates',
         () async {
-      final store = LegacyShortcutStore();
+      final store = SavedShortcutStore();
       await store.add(StoredShortcut(app: downloads));
       await store.add(StoredShortcut(
         app: LaunchableApp.legacyShortcut(
@@ -73,7 +73,7 @@ void main() {
     });
 
     test('two different intents are kept apart', () async {
-      final store = LegacyShortcutStore();
+      final store = SavedShortcutStore();
       await store.add(StoredShortcut(app: downloads));
       await store.add(StoredShortcut(
         app: LaunchableApp.legacyShortcut(uri: 'intent:#Intent;S.p=/b;end', label: 'B'),
@@ -82,7 +82,7 @@ void main() {
     });
 
     test('remove takes one out', () async {
-      final store = LegacyShortcutStore();
+      final store = SavedShortcutStore();
       await store.add(StoredShortcut(app: downloads));
       await store.remove(downloads.id);
       expect(await store.load(), isEmpty);
@@ -90,28 +90,65 @@ void main() {
 
     test('unreadable storage is a miss, not a crash', () async {
       SharedPreferences.setMockInitialValues({
-        'rolidecks.legacyShortcuts.v1': 'not json',
+        'rolidecks.savedShortcuts.v2': 'not json',
       });
-      expect(await LegacyShortcutStore().load(), isEmpty);
+      expect(await SavedShortcutStore().load(), isEmpty);
     });
 
     test('an entry with no intent is dropped rather than half-loaded', () async {
       SharedPreferences.setMockInitialValues({
-        'rolidecks.legacyShortcuts.v1':
+        'rolidecks.savedShortcuts.v2':
             '[{"label":"Broken","kind":"shortcut"}]',
       });
-      expect(await LegacyShortcutStore().load(), isEmpty);
+      expect(await SavedShortcutStore().load(), isEmpty);
     });
 
     test('a corrupt icon does not take the shortcut down with it', () async {
       SharedPreferences.setMockInitialValues({
-        'rolidecks.legacyShortcuts.v1':
+        'rolidecks.savedShortcuts.v2':
             '[{"label":"X","kind":"shortcut","intentUri":"intent:#Intent;end",'
             '"icon":"!!not base64!!"}]',
       });
-      final restored = await LegacyShortcutStore().load();
+      final restored = await SavedShortcutStore().load();
       expect(restored, hasLength(1));
       expect(restored.single.icon, isNull);
+    });
+  });
+
+  group('a pinned shortcut is kept too', () {
+    final pinned = LaunchableApp.shortcut(
+      packageName: 'com.poweramp.player',
+      id: 'playlist-42',
+      label: 'Late nights',
+    );
+
+    test('stored and read back by its own identity', () async {
+      // Kept at accept time rather than looked up afterwards, so it shows
+      // because it was added rather than because a later query returned it.
+      final store = SavedShortcutStore();
+      await store.add(StoredShortcut(
+        app: pinned,
+        icon: Uint8List.fromList([9]),
+      ));
+      final restored = (await SavedShortcutStore().load()).single;
+      expect(restored.app.id, pinned.id);
+      expect(restored.app.shortcutId, 'playlist-42');
+      expect(restored.app.isLegacyShortcut, isFalse);
+      expect(restored.icon, [9]);
+    });
+
+    test('sits alongside a legacy one without colliding', () async {
+      final store = SavedShortcutStore();
+      await store.add(StoredShortcut(app: pinned));
+      await store.add(StoredShortcut(app: downloads));
+      expect(await store.load(), hasLength(2));
+    });
+
+    test('an entry with neither an intent nor an id is dropped', () async {
+      SharedPreferences.setMockInitialValues({
+        'rolidecks.savedShortcuts.v2': '[{"label":"Broken","kind":"shortcut"}]',
+      });
+      expect(await SavedShortcutStore().load(), isEmpty);
     });
   });
 

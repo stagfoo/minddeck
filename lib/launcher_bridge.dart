@@ -227,6 +227,12 @@ class LauncherBridge {
   void onPlatformCalls({
     required void Function() onHomePressed,
     required void Function() onShortcutsChanged,
+    required void Function(
+      String packageName,
+      String shortcutId,
+      String label,
+      Uint8List? icon,
+    ) onShortcutPinned,
     required void Function(String label, String uri, Uint8List? icon)
         onLegacyShortcutCreated,
     required void Function() onShortcutFailed,
@@ -237,6 +243,14 @@ class LauncherBridge {
           onHomePressed();
         case 'shortcutsChanged':
           onShortcutsChanged();
+        case 'shortcutPinned':
+          final args = (call.arguments as Map).cast<Object?, Object?>();
+          onShortcutPinned(
+            (args['packageName'] as String?) ?? '',
+            (args['shortcutId'] as String?) ?? '',
+            (args['label'] as String?) ?? 'Shortcut',
+            args['icon'] as Uint8List?,
+          );
         case 'shortcutFailed':
           onShortcutFailed();
         case 'legacyShortcutCreated':
